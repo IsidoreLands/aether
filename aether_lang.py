@@ -6,7 +6,7 @@ import unittest
 import sys
 
 # --- Grammar ---
-KNOWN_VERBS = ['PERTURBO', 'CONVERGO', 'TOGGEO', 'VERITAS', 'CREO', 'OSTENDO', 'FOCUS', 'SIMULO', 'ANOMALIA']
+KNOWN_VERBS = ['PERTURBO', 'CONVERGO', 'TOGGEO', 'VERITAS', 'CREO', 'OSTENDO', 'FOCUS', 'SIMULO', 'ANOMALIA', 'MULTIVERSUM']
 KNOWN_INFLECTIONS = ['ABAM', 'EBAM', 'AM', 'O', 'E']
 inflection_map = {
     'O': {'mod': 1.0}, 'E': {'mod': -1.0}, 'ABAM': {'mod': 1.5},
@@ -155,11 +155,11 @@ def run_aether_command(cmd, context):
         n = int(num_args[0]) if num_args else 100
         count, pos = lockers(n)
         core.embed_context('cosmos_lockers', pos)
+        core.perturb(random.randint(0,9), random.randint(0,9), count, mod)
+        core.create()
         return f"{verb}{echo_inf} COSMUM APERTOS {count} IDENTITATEM {core.identity_wave:.2f}"
-    
     if verb == 'ANOMALIA':
-        # Embed 2025 JWST anomaly data (hardcoded from search: z>9 excess, red disks z~1, CMB circles)
-        anomalies = [9, 10, 1]  # Redshifts as triad (thesis: z>9 excess, antithesis: z~1 disks, synthesis: CMB)
+        anomalies = [14, 1, 9]  # JWST z anomalies triad
         chunks = dynamic_chunk(anomalies)
         for chunk in chunks:
             synth = triad(chunk, mod)
@@ -167,7 +167,16 @@ def run_aether_command(cmd, context):
             core.embed_context('anomalia_echoes', chunk)
         core.create()
         return f"{verb}{echo_inf} JWST ECHOES EMBEDDED COHERENTEM {core.energy:.2f} IDENTITATEM {core.identity_wave:.2f}"
-    
+    if verb == 'MULTIVERSUM':
+        # Hawking CMB circles as triad radii (e.g., from data: 3,9,27 arcmin scales)
+        hawking_radii = [3, 9, 27]  # Thesis: small spots, antithesis: medium, synthesis: large
+        chunks = dynamic_chunk(hawking_radii)
+        for chunk in chunks:
+            synth = triad(chunk, mod)
+            core.perturb(random.randint(0,9), random.randint(0,9), synth, mod)
+            core.embed_context('multiverse_waves', chunk)
+        core.create()
+        return f"{verb}{echo_inf} HAWKING WAVES EMBEDDED COHERENTEM {core.energy:.2f} IDENTITATEM {core.identity_wave:.2f}"
     return f"{verb}{echo_inf} NON IMPLEMENTATUM"
 
 # --- Test Suite ---
@@ -216,6 +225,16 @@ class TestAetherCFF(unittest.TestCase):
         self.assertIn('anomalia_echoes', core.context_embeddings)
         self.assertGreater(core.energy, 0)
         print("✓ ANOMALIA embeds JWST flux echoes.")
+
+    def test_multiversum_extension(self):
+        run_aether_command("CREO MATERIAM 'plenum'", self.context)
+        run_aether_command("FOCUS MATERIAE 'plenum'", self.context)
+        echo = run_aether_command("MULTIVERSUMO", self.context)
+        core = self.context.get_focused_materia()
+        self.assertIn("HAWKING WAVES EMBEDDED", echo)
+        self.assertIn('multiverse_waves', core.context_embeddings)
+        self.assertGreater(core.energy, 0)
+        print("✓ MULTIVERSUM embeds Hawking wave anomalies.")
 
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'repl':
