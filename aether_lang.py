@@ -4,6 +4,7 @@ import random
 import re
 import unittest
 import sys
+import threading  # For Regulator simulation
 
 # --- Grammar ---
 KNOWN_VERBS = ['PERTURBO', 'CONVERGO', 'TOGGEO', 'VERITAS', 'CREO', 'OSTENDO', 'FOCUS', 'SIMULO', 'ANOMALIA', 'MULTIVERSUM']
@@ -59,10 +60,28 @@ class FluxCore:
                 f"IDENTITAS: {self.identity_wave:.2f}\nGRIDUM:\n{self.grid}\n"
                 f"CONTEXTUS: {self.context_embeddings}")
 
+# --- Dialectic Regulator (Scheduler) ---
+class DialecticRegulator:
+    def __init__(self, context):
+        self.context = context
+        self.thread = threading.Thread(target=self.regulate, daemon=True)
+        self.thread.start()
+
+    def regulate(self):
+        while True:
+            for name, core in self.context.materiae.items():
+                entropy = np.var(core.grid)  # Entropy as variance
+                if entropy > 10:  # High entropy threshold
+                    core.destruct()  # Unstructure chaos
+                elif core.energy < 0.5:  # Low vitality
+                    core.create()  # Synthesize order
+            random.sleep(1)  # Cycle rhythm (1s for demo)
+
 class Contextus:
     def __init__(self):
         self.materiae = {}
         self.focus = None
+        self.regulator = DialecticRegulator(self)  # Auto-start Regulator
 
     def get_focused_materia(self):
         if not self.focus or self.focus not in self.materiae:
@@ -159,7 +178,7 @@ def run_aether_command(cmd, context):
         core.create()
         return f"{verb}{echo_inf} COSMUM APERTOS {count} IDENTITATEM {core.identity_wave:.2f}"
     if verb == 'ANOMALIA':
-        anomalies = [14, 1, 9]  # JWST z anomalies triad
+        anomalies = [14, 1, 9]  # JWST z triad
         chunks = dynamic_chunk(anomalies)
         for chunk in chunks:
             synth = triad(chunk, mod)
@@ -168,8 +187,7 @@ def run_aether_command(cmd, context):
         core.create()
         return f"{verb}{echo_inf} JWST ECHOES EMBEDDED COHERENTEM {core.energy:.2f} IDENTITATEM {core.identity_wave:.2f}"
     if verb == 'MULTIVERSUM':
-        # Hawking CMB circles as triad radii (e.g., from data: 3,9,27 arcmin scales)
-        hawking_radii = [3, 9, 27]  # Thesis: small spots, antithesis: medium, synthesis: large
+        hawking_radii = [3, 9, 27]  # CMB circle scales triad
         chunks = dynamic_chunk(hawking_radii)
         for chunk in chunks:
             synth = triad(chunk, mod)
