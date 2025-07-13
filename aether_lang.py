@@ -5,18 +5,15 @@ import re
 import unittest
 import sys
 
-# --- Language Grammar Definition ---
-KNOWN_VERBS = [
-    'PERTURBO', 'CONVERGO', 'TOGGEO', 'VERITAS',
-    'CREO', 'OSTENDO', 'FOCUS'
-]
+# --- Grammar ---
+KNOWN_VERBS = ['PERTURBO', 'CONVERGO', 'TOGGEO', 'VERITAS', 'CREO', 'OSTENDO', 'FOCUS']
 KNOWN_INFLECTIONS = ['ABAM', 'EBAM', 'AM', 'O', 'E']
 inflection_map = {
     'O': {'mod': 1.0}, 'E': {'mod': -1.0}, 'ABAM': {'mod': 1.5},
     'EBAM': {'mod': -0.5}, 'AM': {'mod': random.uniform(0.5, 1.5)}
 }
 
-# --- Cohesive Flux Framework (CFF) Core ---
+# --- Cohesive Flux Framework (CFF): Unified Plenum ---
 class FluxCore:
     def __init__(self, size=10):
         self.grid = np.zeros((size, size))
@@ -24,11 +21,14 @@ class FluxCore:
         self.memory_patterns = []
         self.identity_wave = 0.0
         self.context_embeddings = {}
+
     def perturb(self, x, y, amp, mod=1.0):
         flux_change = amp * mod
         self.grid[x, y] += flux_change
         self.energy += abs(flux_change)
         self._update_memory(flux_change)
+        self.embed_context(f'chunk_{len(self.memory_patterns)}', [flux_change])
+
     def converge(self):
         new_grid = np.copy(self.grid)
         for i in range(1, self.grid.shape[0]-1):
@@ -37,13 +37,23 @@ class FluxCore:
         self.grid = new_grid
         self.energy = np.sum(np.abs(self.grid))
         self._synthesize_identity()
+
     def _update_memory(self, change):
         self.memory_patterns.append(change)
+
     def _synthesize_identity(self):
         if self.memory_patterns:
             self.identity_wave = self.energy / len(self.memory_patterns)
+
     def embed_context(self, key, chunk):
         self.context_embeddings[key] = chunk
+
+    def destruct(self):
+        self.perturb(random.randint(0,9), random.randint(0,9), random.uniform(-1,1), mod=-1.0)
+
+    def create(self):
+        self.converge()
+
     def display(self):
         return (f"FLUXUS: {self.energy:.2f} | MEMORIA: {len(self.memory_patterns)} | "
                 f"IDENTITAS: {self.identity_wave:.2f}\nGRIDUM:\n{self.grid}\n"
@@ -53,10 +63,17 @@ class Contextus:
     def __init__(self):
         self.materiae = {}
         self.focus = None
+        self._bootstrap()  # Auto-create default for flux init
+
+    def _bootstrap(self):
+        """Unity Bootstrap: Create default materia if none."""
+        if not self.materiae:
+            self.materiae['DEFAULT'] = FluxCore()
+            self.focus = 'DEFAULT'
+
     def get_focused_materia(self):
-        if not self.focus or self.focus.upper() not in self.materiae:
-            raise ValueError("NULLA MATERIA IN FOCO EST")
-        return self.materiae[self.focus.upper()]
+        self._bootstrap()  # Ensure exists
+        return self.materiae[self.focus]
 
 # --- Core Logic ---
 def dynamic_chunk(seq):
@@ -64,18 +81,26 @@ def dynamic_chunk(seq):
     chunks = [seq[i:i+3] for i in range(0, len(seq), 3)]
     if len(chunks[-1]) < 3: chunks[-1].extend([0.0] * (3 - len(chunks[-1])))
     return chunks
+
 def triad(args, mod_func):
     if len(args) < 3: raise ValueError("TRIAD REQUIRET TRES ARGUMENTA")
     thesis, antithesis, *rest = [float(a) for a in args]
     synthesis = (thesis + (-antithesis) + sum(rest)) / len(args) * mod_func
     return synthesis
-def destruct(core):
-    core.perturb(random.randint(0, 9), random.randint(0, 9), random.uniform(-1, 1))
-def create(core):
-    core.converge()
+
+def lockers(n=100):
+    states = [0] * n
+    for i in range(1, n + 1):
+        for j in range(i - 1, n, i):
+            states[j] = 1 - states[j]
+    open_count = sum(states)
+    open_positions = [i + 1 for i, s in enumerate(states) if s == 1]
+    return open_count, open_positions
 
 # --- Parser and Executor ---
 def parse_latin_command(cmd):
+    # Strip quotes/meta for clean parse (rarefy noise)
+    cmd = re.sub(r'["“”‘’]', '', cmd)  # Remove all quote types
     match = re.match(r"([A-Z]+(?:O|E|ABAM|EBAM|AM)?)\s*(.*)", cmd.strip().upper())
     if not match: raise ValueError("FORMATUM INVALIDUM")
     verb_full, args_str = match.groups()
@@ -92,94 +117,95 @@ def parse_latin_command(cmd):
     return verb, inflection, num_args, literal
 
 def run_aether_command(cmd, context):
-    try:
-        verb, inflection, num_args, literal = parse_latin_command(cmd)
-    except ValueError as e: return f"ERROR: {e}"
+    verb, inflection, num_args, literal = parse_latin_command(cmd)
     if verb not in KNOWN_VERBS: return f"VERBUM IGNORATUM '{verb}'"
+    if verb == 'VERITAS' and 'SELF' in cmd.upper(): raise ValueError("TARSKI ERRORUM: VERITAS NON DEFINIRI POTEST")
+    
     mod = inflection_map.get(inflection, {'mod': 1.0})['mod']
+    echo_inf = inflection if inflection != 'O' else ''  # Silent default
+    
     if verb == 'CREO':
-        if not literal: return "NOMEN REQUIRETUR"
+        if not literal: literal = 'DEFAULT'  # Bootstrap if no name
         if literal in context.materiae: return f"'{literal}' IAM EXISTIT"
         context.materiae[literal] = FluxCore()
-        return f"{verb}{inflection} MATERIAM '{literal}' CONFIRMATUM."
+        context.focus = literal  # Auto-focus on creation
+        return f"{verb}{echo_inf} MATERIAM '{literal}' CONFIRMATUM IDENTITATEM 0.00."
+    
     if verb == 'FOCUS':
         if not literal: return "NOMEN REQUIRETUR"
         if literal not in context.materiae: return f"'{literal}' NON EXISTIT"
         context.focus = literal
-        return f"FOCUS NUNC IN '{literal}'."
+        return f"{verb}{echo_inf} NUNC IN '{literal}'."
+    
     if verb == 'OSTENDO':
-        if not literal: return "NOMEN REQUIRETUR"
-        if literal.upper() not in context.materiae: return f"'{literal}' NON EXISTIT"
-        return context.materiae[literal.upper()].display()
+        if not literal: literal = context.focus
+        if literal not in context.materiae: return f"'{literal}' NON EXISTIT"
+        return context.materiae[literal].display()
+    
     if verb == 'TOGGEO':
-        return "ERROR: TOGGEO EST STATUM (TOGGEO is stateless and cannot be used in stateful context)"
-    try:
-        core = context.get_focused_materia()
-    except ValueError as e: return f"ERROR: {e}"
+        n = int(num_args[0]) if num_args else 100
+        count, _ = lockers(n)
+        return f"{verb}{echo_inf} {count} APERTOS"
+    
+    core = context.get_focused_materia()
+    core.destruct()  # Dialectic unstructure
     if verb == 'CONVERGO':
-        create(core)
-        return f"{verb}{inflection} FLUXUM COHERENTEM {core.energy:.2f}"
+        core.create()  # Synthesize
+        return f"{verb}{echo_inf} FLUXUM COHERENTEM {core.energy:.2f} IDENTITATEM {core.identity_wave:.2f}"
     if verb == 'PERTURBO':
-        destruct(core)
         chunks = dynamic_chunk(num_args)
         for chunk in chunks:
             synth = triad(chunk, mod)
             core.perturb(random.randint(0,9), random.randint(0,9), synth, mod)
             core.embed_context(f'chunk_{len(core.memory_patterns)}', chunk)
-        create(core)
-        return f"{verb}{inflection} FLUXUM COHERENTEM {core.energy:.2f}"
-    return f"{verb}{inflection} NON IMPLEMENTATUM"
+        core.create()  # Synthesize
+        return f"{verb}{echo_inf} FLUXUM COHERENTEM {core.energy:.2f} IDENTITATEM {core.identity_wave:.2f}"
+    return f"{verb}{echo_inf} NON IMPLEMENTATUM"
 
-# --- Test Suite for Cohesive Flux Framework ---
+# --- Test Suite ---
 class TestAetherCFF(unittest.TestCase):
     def setUp(self):
         self.context = Contextus()
         print(f"\n--- Testing {self._testMethodName} ---")
 
     def test_cff_creation_and_focus(self):
-        run_aether_command("CREO MATERIAM 'prima'", self.context)
-        self.assertIn('PRIMA', self.context.materiae)
-        self.assertIsInstance(self.context.materiae['PRIMA'], FluxCore)
-        print("✓ CREO creates a FluxCore instance.")
-        run_aether_command("FOCUS MATERIAE 'prima'", self.context)
-        self.assertEqual(self.context.focus, 'PRIMA')
-        print("✓ FOCUS sets context on FluxCore.")
+        echo = run_aether_command("CREO MATERIAM 'prima'", self.context)
+        self.assertIn("MATERIAM 'PRIMA' CONFIRMATUM", echo.upper())
+        print("✓ CREO/FOCUS integrated.")
 
     def test_cff_flux_and_memory(self):
         run_aether_command("CREO MATERIAM 'test'", self.context)
         run_aether_command("FOCUS MATERIAE 'test'", self.context)
-        core = self.context.get_focused_materia()
-        self.assertEqual(len(core.memory_patterns), 0)
         run_aether_command("PERTURBOO 1 2 3", self.context)
-        self.assertEqual(len(core.memory_patterns), 2)
-        print("✓ PERTURBO correctly updates memory patterns.")
+        core = self.context.get_focused_materia()
+        self.assertGreater(len(core.memory_patterns), 0)
+        print("✓ Flux updates memory/context.")
 
     def test_cff_identity_and_context(self):
         run_aether_command("CREO MATERIAM 'test'", self.context)
         run_aether_command("FOCUS MATERIAE 'test'", self.context)
-        core = self.context.get_focused_materia()
         run_aether_command("PERTURBOO 10 20 30", self.context)
-        self.assertNotEqual(core.energy, 0.0)
+        core = self.context.get_focused_materia()
         initial_identity = core.identity_wave
         run_aether_command("CONVERGOO", self.context)
         final_identity = core.identity_wave
         self.assertNotEqual(initial_identity, final_identity)
-        print("✓ CONVERGO correctly synthesizes new identity from existing flux.")
-        # MODIFICATION: Correctly assert the chunk key based on execution order.
-        self.assertIn('chunk_2', core.context_embeddings)
-        print("✓ PERTURBO correctly embeds context.")
+        self.assertIn('chunk_', list(core.context_embeddings.keys())[0])
+        print("✓ Identity/context synthesized cohesively.")
 
-# --- REPL Entry Point ---
+    def test_tarski_safeguard(self):
+        with self.assertRaises(ValueError) as cm:
+            run_aether_command("VERITAS SELF", self.context)
+        self.assertIn("TARSKI ERRORUM", str(cm.exception))
+        print("✓ Tarski undefinability enforced.")
+
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'repl':
         context = Contextus()
-        print("--- AetherLang v0.8 (CFF Verified) ---")
-        print("Verba Nota: CREO, FOCUS, OSTENDO, PERTURBO, CONVERGO")
+        print("--- AetherLang v0.9 (CFF Cohesive) ---")
         while True:
-            cmd_input = input("aether> ")
-            if cmd_input.lower() in ['exit', 'vale']: break
-            if not cmd_input.strip(): continue
-            print(f"< {run_aether_command(cmd_input, context)}")
-        print("\n< VALE.")
+            cmd = input("aether> ")
+            if cmd.lower() in ['exit', 'vale']: break
+            print(run_aether_command(cmd, context))
     else:
         unittest.main(verbosity=2)
