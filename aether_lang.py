@@ -4,7 +4,8 @@ import random
 import re
 import unittest
 import sys
-import threading  # For Regulator simulation
+import threading
+import time  # Added for sleep in Regulator
 
 # --- Grammar ---
 KNOWN_VERBS = ['PERTURBO', 'CONVERGO', 'TOGGEO', 'VERITAS', 'CREO', 'OSTENDO', 'FOCUS', 'SIMULO', 'ANOMALIA', 'MULTIVERSUM']
@@ -75,7 +76,7 @@ class DialecticRegulator:
                     core.destruct()  # Unstructure chaos
                 elif core.energy < 0.5:  # Low vitality
                     core.create()  # Synthesize order
-            random.sleep(1)  # Cycle rhythm (1s for demo)
+            time.sleep(1)  # Cycle rhythm (1s for demo)
 
 class Contextus:
     def __init__(self):
