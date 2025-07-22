@@ -13,7 +13,7 @@ AetherOS is in early prototype stage, emphasizing purity and minimal dependencie
 
 bash
 
-git clone https://github.com/your-repo/aetheros.git
+git clone [https://github.com/IsidoreLands/aether.git]
 cd aetheros
 python aether_os.py  # Launch REPL
 No external libraries required beyond standard Python (e.g., os, sys, random, re, time, unittest). For oracle bridges (optional LLM integration), configure .env with API keys (e.g., GEMINI_API_KEY). Future builds aim for hybrid C core with Python as mere entry bridge.
