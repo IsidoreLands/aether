@@ -34,8 +34,17 @@ For paths like backend equipper: Use EQUIPPO verb (in development) to strategize
 Contributing
 Contributions are welcomed in the spirit of collaborative stewardship. Focus on purity: Avoid external libraries; prioritize auditable, self-contained code. Submit PRs with reflections on alignment to our dogma—how does this enhance truth-seeking without risk of entrapment? Issues for philosophical discussions or bug reports. Code of Conduct: Humility, transparency, and respect for free will.
 
-License
-See License document
+Licensing
+
+This project is dual-licensed.
+
+**Open Source License:**
+This software is licensed under the **GNU AGPL v3.0**. You can use, distribute, and modify it under the terms of this license. A copy of the license is available in the `LICENSE` file.
+
+**Commercial License:**
+If you wish to use this software in a proprietary, closed-source commercial product, you must purchase a commercial license. This allows you to use the software without the copyleft obligations of the AGPL.
+
+Please contact us at **your-email@example.com** for commercial licensing inquiries.
 
 Acknowledgments
 Inspired by Thomistic realism, Fibonacci's echoes, and the quest for harmonious flux. Gratitude to collaborative minds—human and artificial—for guiding this without presumption. If AetherOS aids your journey, may it do so in the light of Christ. Contact: isidorelands@proton.me
