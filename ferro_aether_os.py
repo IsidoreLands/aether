@@ -74,16 +74,25 @@ def draw_kepler_lines(lines, p1, p2, p3, depth, max_depth):
     draw_kepler_lines(lines, D, p2, p1, depth + 1, max_depth)
     draw_kepler_lines(lines, D, p3, p1, depth + 1, max_depth)
 
-def generate_kepler_lines(max_depth=5):
+def generate_kepler_lines(max_depth=5, size=1000):
     phi = (1 + np.sqrt(5)) / 2
     sqrt_phi = np.sqrt(phi)
-    long_leg = 999
+    long_leg = size - 1
     short_leg = int(np.round(long_leg / sqrt_phi))
+    
+    # Bottom-left triangle
     point_a = np.array([0, 0])
     point_b = np.array([short_leg, 0])
     point_c = np.array([0, long_leg])
+    
+    # Mirrored top-right triangle
+    point_d = np.array([size - 1, size - 1])
+    point_e = np.array([size - 1 - short_leg, size - 1])
+    point_f = np.array([size - 1, size - 1 - long_leg])
+    
     lines = []
     draw_kepler_lines(lines, point_a, point_b, point_c, 0, max_depth)
+    draw_kepler_lines(lines, point_d, point_e, point_f, 0, max_depth)
     return lines
 
 # --- Cohesive Flux Framework (CFF): Associative Lagrangian Energies ---
@@ -92,8 +101,8 @@ class FluxCore:
     def __init__(self, size=1000):
         self.size = size
         self.grid = np.zeros((size, size))
-        # Initialize with Kepler grid pattern
-        lines = generate_kepler_lines(max_depth=5)  # Adjust max_depth for density
+        # Initialize with mirrored Kepler grid pattern
+        lines = generate_kepler_lines(max_depth=5, size=size)  # Adjust max_depth for density
         for line in lines:
             p1, p2 = line
             points = get_line((int(p1[0]), int(p1[1])), (int(p2[0]), int(p2[1])))
