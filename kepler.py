@@ -38,16 +38,14 @@ class KeplerGrid:
     def __init__(self, max_depth=5):
         self.max_depth = max_depth
         self.size = cfg.grid_size  # From shared config
-        self.pad_offset = int((cfg.margin_mm / cfg.physical_size_mm) * self.size)  # Scale margin to units (e.g., ~50 units for 50mm)
+        self.pad_offset = int((cfg.margin_mm / cfg.physical_size_mm) * self.size)  # Scale margin to units
         self.axis_pad = self.pad_offset + 20
         
-        # --- Physical Properties ---
         phi = (1 + np.sqrt(5)) / 2
         sqrt_phi = np.sqrt(phi)
         self.long_leg = self.size - 1
         self.short_leg = int(np.round(self.long_leg / sqrt_phi))
 
-        # --- Grid & Pad Coordinates for Bottom-Left Triangle ---
         self.point_a = np.array([0, 0])
         self.point_b = np.array([self.short_leg, 0])
         self.point_c = np.array([0, self.long_leg])
@@ -55,7 +53,6 @@ class KeplerGrid:
         self.pad_b = np.array([self.point_b[0], -self.pad_offset])
         self.pad_c = np.array([-self.pad_offset, self.point_c[1]])
 
-        # --- Grid & Pad Coordinates for Mirrored Top-Right Triangle ---
         self.point_d = np.array([self.size - 1, self.size - 1])
         self.point_e = np.array([self.size - 1 - self.short_leg, self.size - 1])
         self.point_f = np.array([self.size - 1, self.size - 1 - self.long_leg])
@@ -72,7 +69,7 @@ class KeplerGrid:
         if depth == self.max_depth:
             return
         short = np.linalg.norm(p2 - p1)
-        if short < 1e-6:  # Avoid degenerate cases
+        if short < 1e-6:
             return
         hyp = np.linalg.norm(p3 - p2)
         BD = short ** 2 / hyp
@@ -83,16 +80,12 @@ class KeplerGrid:
         self.draw_kepler(lines, D, p3, p1, depth + 1)
 
     def generate_lines(self):
-        """Generates the lines for the Kepler meshes only."""
         lines = []
-        # Original triangle
         self.draw_kepler(lines, self.point_a, self.point_b, self.point_c, 0)
-        # Mirrored triangle
         self.draw_kepler(lines, self.point_d, self.point_e, self.point_f, 0)
         return lines
 
     def generate_grid_array(self):
-        """Generates the NumPy array for the Kepler meshes only."""
         grid = np.zeros((self.size, self.size))
         lines = self.generate_lines()
         for line in lines:
@@ -104,36 +97,32 @@ class KeplerGrid:
         return grid
 
     def generate_plot(self):
-        """Generates the full plot including grids, pads, and breakers."""
         kepler_lines = self.generate_lines()
         
-        # --- Setup Plot Canvas ---
         fig, ax = plt.subplots(figsize=(9, 9))
         ax.set_xlim(-self.axis_pad, self.size + self.axis_pad)
         ax.set_ylim(-self.axis_pad, self.size + self.axis_pad)
         ax.set_aspect('equal')
-        ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.5, color='gray')  # Reference grid in gray
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.5, color='gray')
 
-        # --- Plot Kepler Grids (copper in red for visual diff) ---
         for line in kepler_lines:
             p1, p2 = line
-            ax.plot([p1[0], p2[0]], [p1[1], p2[1]], 'r-', linewidth=1.5)  # Copper color
+            ax.plot([p1[0], p2[0]], [p1[1], p2[1]], 'r-', linewidth=1.5)
 
-        # --- Plot Connections & Breakers for Bottom-Left Grid (redundant paths) ---
-        # A (dual paths with curve approx)
-        ax.plot([self.point_a[0], self.pad_a[0] - 10, self.pad_a[0]], [self.point_a[1], self.pad_a[1] + 30, self.pad_a[1] + 20], 'r-', linewidth=1.5)  # Redundant path 1
-        ax.plot([self.point_a[0] + 5, self.pad_a[0] + 10, self.pad_a[0]], [self.point_a[1] - 5, self.pad_a[1] + 25, self.pad_a[1] + 20], 'r-', linewidth=1.5)  # Redundant path 2
+        # A
+        ax.plot([self.point_a[0], self.pad_a[0] - 10, self.pad_a[0]], [self.point_a[1], self.pad_a[1] + 30, self.pad_a[1] + 20], 'r-', linewidth=1.5)
+        ax.plot([self.point_a[0] + 5, self.pad_a[0] + 10, self.pad_a[0]], [self.point_a[1] - 5, self.pad_a[1] + 25, self.pad_a[1] + 20], 'r-', linewidth=1.5)
         ax.plot([self.pad_a[0] - 10, self.pad_a[0] + 10, self.pad_a[0] - 10, self.pad_a[0] + 10, self.pad_a[0]],
-                [self.pad_a[1] + 20, self.pad_a[1] + 15, self.pad_a[1] + 10, self.pad_a[1] + 5, self.pad_a[1]], 'r-', linewidth=0.5)  # Breaker
-        ax.text(self.pad_a[0] + 20, self.pad_a[1], 'Breaker A (0.15mm fuse)', fontsize=8, color='blue')  # Reference label
-        
-        # B (similar)
+                [self.pad_a[1] + 20, self.pad_a[1] + 15, self.pad_a[1] + 10, self.pad_a[1] + 5, self.pad_a[1]], 'r-', linewidth=0.5)
+        ax.text(self.pad_a[0] + 20, self.pad_a[1], 'Breaker A (0.15mm fuse)', fontsize=8, color='blue')
+
+        # B
         ax.plot([self.point_b[0], self.pad_b[0] - 10, self.pad_b[0]], [self.point_b[1], self.pad_b[1] + 30, self.pad_b[1] + 20], 'r-', linewidth=1.5)
         ax.plot([self.point_b[0] - 5, self.pad_b[0] + 10, self.pad_b[0]], [self.point_b[1] - 5, self.pad_b[1] + 25, self.pad_b[1] + 20], 'r-', linewidth=1.5)
         ax.plot([self.pad_b[0] - 10, self.pad_b[0] + 10, self.pad_b[0] - 10, self.pad_b[0] + 10, self.pad_b[0]],
                 [self.pad_b[1] + 20, self.pad_b[1] + 15, self.pad_b[1] + 10, self.pad_b[1] + 5, self.pad_b[1]], 'r-', linewidth=0.5)
         ax.text(self.pad_b[0] + 20, self.pad_b[1], 'Breaker B (0.15mm fuse)', fontsize=8, color='blue')
-        
+
         # C
         ax.plot([self.point_c[0], self.pad_c[0] + 30, self.pad_c[0] + 20], [self.point_c[1], self.pad_c[1] - 10, self.pad_c[1]], 'r-', linewidth=1.5)
         ax.plot([self.point_c[0] - 5, self.pad_c[0] + 25, self.pad_c[0] + 20], [self.point_c[1] + 5, self.pad_c[1] + 10, self.pad_c[1]], 'r-', linewidth=1.5)
@@ -141,21 +130,20 @@ class KeplerGrid:
                 [self.pad_c[1] - 10, self.pad_c[1] + 10, self.pad_c[1] - 10, self.pad_c[1] + 10, self.pad_c[1]], 'r-', linewidth=0.5)
         ax.text(self.pad_c[0], self.pad_c[1] + 20, 'Breaker C (0.15mm fuse)', fontsize=8, color='blue')
 
-        # --- Plot Connections & Breakers for Top-Right Grid (similar redundancy) ---
         # D
         ax.plot([self.point_d[0], self.pad_d[0] - 10, self.pad_d[0]], [self.point_d[1], self.pad_d[1] - 30, self.pad_d[1] - 20], 'r-', linewidth=1.5)
         ax.plot([self.point_d[0] + 5, self.pad_d[0] + 10, self.pad_d[0]], [self.point_d[1] + 5, self.pad_d[1] - 25, self.pad_d[1] - 20], 'r-', linewidth=1.5)
         ax.plot([self.pad_d[0] - 10, self.pad_d[0] + 10, self.pad_d[0] - 10, self.pad_d[0] + 10, self.pad_d[0]],
                 [self.pad_d[1] - 20, self.pad_d[1] - 15, self.pad_d[1] - 10, self.pad_d[1] - 5, self.pad_d[1]], 'r-', linewidth=0.5)
         ax.text(self.pad_d[0] + 20, self.pad_d[1], 'Breaker D (0.15mm fuse)', fontsize=8, color='blue')
-        
+
         # E
         ax.plot([self.point_e[0], self.pad_e[0] - 10, self.pad_e[0]], [self.point_e[1], self.pad_e[1] - 30, self.pad_e[1] - 20], 'r-', linewidth=1.5)
         ax.plot([self.point_e[0] - 5, self.pad_e[0] + 10, self.pad_e[0]], [self.point_e[1] + 5, self.pad_e[1] - 25, self.pad_e[1] - 20], 'r-', linewidth=1.5)
         ax.plot([self.pad_e[0] - 10, self.pad_e[0] + 10, self.pad_e[0] - 10, self.pad_e[0] + 10, self.pad_e[0]],
                 [self.pad_e[1] - 20, self.pad_e[1] - 15, self.pad_e[1] - 10, self.pad_e[1] - 5, self.pad_e[1]], 'r-', linewidth=0.5)
         ax.text(self.pad_e[0] + 20, self.pad_e[1], 'Breaker E (0.15mm fuse)', fontsize=8, color='blue')
-        
+
         # F
         ax.plot([self.point_f[0], self.pad_f[0] - 30, self.pad_f[0] - 20], [self.point_f[1], self.pad_f[1] - 10, self.pad_f[1]], 'r-', linewidth=1.5)
         ax.plot([self.point_f[0] + 5, self.pad_f[0] - 25, self.pad_f[0] - 20], [self.point_f[1] + 5, self.pad_f[1] + 10, self.pad_f[1]], 'r-', linewidth=1.5)
@@ -163,50 +151,69 @@ class KeplerGrid:
                 [self.pad_f[1] - 10, self.pad_f[1] + 10, self.pad_f[1] - 10, self.pad_f[1] + 10, self.pad_f[1]], 'r-', linewidth=0.5)
         ax.text(self.pad_f[0], self.pad_f[1] + 20, 'Breaker F (0.15mm fuse)', fontsize=8, color='blue')
 
-        # --- Optional Ground Trace (external routing between grids for safety) ---
+        # Optional Ground Trace
         ground_mid_bottom = np.array([self.size / 2, -self.pad_offset])
         ground_mid_top = np.array([self.size / 2, self.size + self.pad_offset])
         ax.plot([ground_mid_bottom[0] - 20, ground_mid_bottom[0] + 20], [ground_mid_bottom[1], ground_mid_bottom[1]], 'r--', linewidth=1.5, label='Optional Ground Trace')
         ax.plot([ground_mid_top[0] - 20, ground_mid_top[0] + 20], [ground_mid_top[1], ground_mid_top[1]], 'r--', linewidth=1.5)
 
-        # --- Mark all 6 External Solder Pads ---
+        # Mark all 6 External Solder Pads
         all_pads_x = [self.pad_a[0], self.pad_b[0], self.pad_c[0], self.pad_d[0], self.pad_e[0], self.pad_f[0]]
         all_pads_y = [self.pad_a[1], self.pad_b[1], self.pad_c[1], self.pad_d[1], self.pad_e[1], self.pad_f[1]]
-        ax.scatter(all_pads_x, all_pads_y, color='green', s=100, label='External Solder Pads', zorder=5)  # Green for pads in visual
+        ax.scatter(all_pads_x, all_pads_y, color='green', s=100, label='External Solder Pads', zorder=5)
 
-        # --- Final Touches ---
-        ax.set_title('Mirrored Kepler Grids on 1000 × 1000 Units (12" × 12" Acrylic)\nwith Enhanced Safety, Reliability, and Efficiency Features\n(Insulate Traces; Use Non-Toxic Etching with Ventilation)')
+        ax.set_title('Mirrored Kepler Grids on 1000 × 1000 Units (18" × 18" Acrylic)\nwith Enhanced Safety, Reliability, and Efficiency Features\n(Insulate Traces; Use Non-Toxic Etching with Ventilation)')
         
-        # Save full visual SVG/PNG (with colors for reference)
         plt.savefig('kepler_full_visual.png', dpi=300)
         plt.savefig('kepler_full_visual.svg', format='svg')
         
-        # Save copper-only SVG (black lines, no colors/labels for direct KiCAD import to F.Cu)
+        # Copper-only
         copper_fig, copper_ax = plt.subplots(figsize=(9, 9))
         copper_ax.set_xlim(-self.axis_pad, self.size + self.axis_pad)
         copper_ax.set_ylim(-self.axis_pad, self.size + self.axis_pad)
         copper_ax.set_aspect('equal')
-        copper_ax.axis('off')  # No reference grid
+        copper_ax.axis('off')
         for line in kepler_lines:
             p1, p2 = line
             copper_ax.plot([p1[0], p2[0]], [p1[1], p2[1]], 'k-', linewidth=1.5)
-        # Add extensions and breakers in black (omit labels/grounds as non-copper)
-        # Repeat plotting for A-F extensions/breakers here without text or colors
+        # A
         copper_ax.plot([self.point_a[0], self.pad_a[0] - 10, self.pad_a[0]], [self.point_a[1], self.pad_a[1] + 30, self.pad_a[1] + 20], 'k-', linewidth=1.5)
         copper_ax.plot([self.point_a[0] + 5, self.pad_a[0] + 10, self.pad_a[0]], [self.point_a[1] - 5, self.pad_a[1] + 25, self.pad_a[1] + 20], 'k-', linewidth=1.5)
         copper_ax.plot([self.pad_a[0] - 10, self.pad_a[0] + 10, self.pad_a[0] - 10, self.pad_a[0] + 10, self.pad_a[0]],
                        [self.pad_a[1] + 20, self.pad_a[1] + 15, self.pad_a[1] + 10, self.pad_a[1] + 5, self.pad_a[1]], 'k-', linewidth=0.5)
-        # ... (repeat for B, C, D, E, F similarly)
+        # B
+        copper_ax.plot([self.point_b[0], self.pad_b[0] - 10, self.pad_b[0]], [self.point_b[1], self.pad_b[1] + 30, self.pad_b[1] + 20], 'k-', linewidth=1.5)
+        copper_ax.plot([self.point_b[0] - 5, self.pad_b[0] + 10, self.pad_b[0]], [self.point_b[1] - 5, self.pad_b[1] + 25, self.pad_b[1] + 20], 'k-', linewidth=1.5)
+        copper_ax.plot([self.pad_b[0] - 10, self.pad_b[0] + 10, self.pad_b[0] - 10, self.pad_b[0] + 10, self.pad_b[0]],
+                       [self.pad_b[1] + 20, self.pad_b[1] + 15, self.pad_b[1] + 10, self.pad_b[1] + 5, self.pad_b[1]], 'k-', linewidth=0.5)
+        # C
+        copper_ax.plot([self.point_c[0], self.pad_c[0] + 30, self.pad_c[0] + 20], [self.point_c[1], self.pad_c[1] - 10, self.pad_c[1]], 'k-', linewidth=1.5)
+        copper_ax.plot([self.point_c[0] - 5, self.pad_c[0] + 25, self.pad_c[0] + 20], [self.point_c[1] + 5, self.pad_c[1] + 10, self.pad_c[1]], 'k-', linewidth=1.5)
+        copper_ax.plot([self.pad_c[0] + 20, self.pad_c[0] + 15, self.pad_c[0] + 10, self.pad_c[0] + 5, self.pad_c[0]],
+                       [self.pad_c[1] - 10, self.pad_c[1] + 10, self.pad_c[1] - 10, self.pad_c[1] + 10, self.pad_c[1]], 'k-', linewidth=0.5)
+        # D
+        copper_ax.plot([self.point_d[0], self.pad_d[0] - 10, self.pad_d[0]], [self.point_d[1], self.pad_d[1] - 30, self.pad_d[1] - 20], 'k-', linewidth=1.5)
+        copper_ax.plot([self.point_d[0] + 5, self.pad_d[0] + 10, self.pad_d[0]], [self.point_d[1] + 5, self.pad_d[1] - 25, self.pad_d[1] - 20], 'k-', linewidth=1.5)
+        copper_ax.plot([self.pad_d[0] - 10, self.pad_d[0] + 10, self.pad_d[0] - 10, self.pad_d[0] + 10, self.pad_d[0]],
+                       [self.pad_d[1] - 20, self.pad_d[1] - 15, self.pad_d[1] - 10, self.pad_d[1] - 5, self.pad_d[1]], 'k-', linewidth=0.5)
+        # E
+        copper_ax.plot([self.point_e[0], self.pad_e[0] - 10, self.pad_e[0]], [self.point_e[1], self.pad_e[1] - 30, self.pad_e[1] - 20], 'k-', linewidth=1.5)
+        copper_ax.plot([self.point_e[0] - 5, self.pad_e[0] + 10, self.pad_e[0]], [self.point_e[1] + 5, self.pad_e[1] - 25, self.pad_e[1] - 20], 'k-', linewidth=1.5)
+        copper_ax.plot([self.pad_e[0] - 10, self.pad_e[0] + 10, self.pad_e[0] - 10, self.pad_e[0] + 10, self.pad_e[0]],
+                       [self.pad_e[1] - 20, self.pad_e[1] - 15, self.pad_e[1] - 10, self.pad_e[1] - 5, self.pad_e[1]], 'k-', linewidth=0.5)
+        # F
+        copper_ax.plot([self.point_f[0], self.pad_f[0] - 30, self.pad_f[0] - 20], [self.point_f[1], self.pad_f[1] - 10, self.pad_f[1]], 'k-', linewidth=1.5)
+        copper_ax.plot([self.point_f[0] + 5, self.pad_f[0] - 25, self.pad_f[0] - 20], [self.point_f[1] + 5, self.pad_f[1] + 10, self.pad_f[1]], 'k-', linewidth=1.5)
+        copper_ax.plot([self.pad_f[0] - 20, self.pad_f[0] - 15, self.pad_f[0] - 10, self.pad_f[0] - 5, self.pad_f[0]],
+                       [self.pad_f[1] - 10, self.pad_f[1] + 10, self.pad_f[1] - 10, self.pad_f[1] + 10, self.pad_f[1]], 'k-', linewidth=0.5)
         copper_fig.savefig('kepler_copper_only.svg', format='svg')
-        plt.close(copper_fig)  # Close copper fig
-        
+        plt.close(copper_fig)
+
         plt.show()
 
-        # Save rasterized grid for reference/simulation mirroring
         grid_array = self.generate_grid_array()
         np.savez('kepler_grid_final.npz', grid=grid_array)
 
-# --- Main Execution ---
 if __name__ == '__main__':
     grid = KeplerGrid(max_depth=5)
     grid.generate_plot()

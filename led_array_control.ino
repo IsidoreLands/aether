@@ -1,7 +1,7 @@
 #include <FastLED.h>
 
 #define LED_PIN     6  // Data pin for WS2812B
-#define NUM_LEDS    400  // 20x20 array
+#define NUM_LEDS    961  // 31x31 array for 18" x 18" grid with 15mm spacing
 #define LED_TYPE    WS2812B
 #define COLOR_ORDER GRB
 #define BRIGHTNESS  64  // 0-255, adjust for power/heat
@@ -30,7 +30,7 @@ void loop() {
 }
 
 void blueAgitate() {
-  // Flashing blue pattern for high-energy agitation
+  // Flashing blue pattern for high-energy agitation mode
   for (int i = 0; i < NUM_LEDS; i++) {
     leds[i] = CRGB(0, 0, 255);  // Full blue
   }
