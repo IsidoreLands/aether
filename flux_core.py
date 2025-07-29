@@ -1,15 +1,14 @@
+
 # flux_core.py
 #
 # Description:
 # This module defines the fundamental units of existence in the AetherOS plenum.
-# - FluxCore: The base entity, representing a point of flux in a grid.
-# - Intellectus: A specialized FluxCore capable of higher-order thought.
-#
-# It depends on the global 'ferro_sensor' from sensor_hook.py to ground its
-# physics in real-time, non-deterministic data.
+# In v4, the FluxCore is now grounded not only by abstract sextet data but also by a
+# continuous visual feed from the physical ferrocell, merging simulation with reality.
 
 import numpy as np
 import random
+import cv2
 
 # Import the global sensor instance
 from sensor_hook import ferro_sensor
@@ -17,68 +16,47 @@ from sensor_hook import ferro_sensor
 # --- Geometric Primitives for Grid Initialization ---
 
 def get_line(start, end):
-    """
-    Bresenham's Line Algorithm. Produces a list of tuples (x, y) from start to end.
-    """
-    x1, y1 = start
-    x2, y2 = end
-    dx = x2 - x1
-    dy = y2 - y1
-    is_steep = abs(dy) > abs(dx)
-    if is_steep:
-        x1, y1 = y1, x1
-        x2, y2 = y2, x2
-    swapped = False
-    if x1 > x2:
-        x1, x2 = x2, x1
-        y1, y2 = y2, y1
-        swapped = True
-    dx = x2 - x1
-    dy = abs(y2 - y1)
-    error = int(dx / 2.0)
-    ystep = 1 if y1 < y2 else -1
-    y = y1
+    """Bresham's Line Algorithm."""
+    x1, y1, x2, y2 = int(start[0]), int(start[1]), int(end[0]), int(end[1])
+    dx = abs(x2 - x1)
+    dy = -abs(y2 - y1)
+    sx = 1 if x1 < x2 else -1
+    sy = 1 if y1 < y2 else -1
+    err = dx + dy
     points = []
-    for x in range(x1, x2 + 1):
-        coord = (y, x) if is_steep else (x, y)
-        points.append(coord)
-        error -= dy
-        if error < 0:
-            y += ystep
-            error += dx
-    if swapped:
-        points.reverse()
+    while True:
+        points.append((x1, y1))
+        if x1 == x2 and y1 == y2: break
+        e2 = 2 * err
+        if e2 >= dy:
+            err += dy
+            x1 += sx
+        if e2 <= dx:
+            err += dx
+            y1 += sy
     return points
 
 def _draw_kepler_recursive(lines, p1, p2, p3, depth, max_depth):
     """Helper for recursively generating Kepler triangle lines."""
-    if depth > max_depth:
-        return
-    lines.append((p1, p2))
-    lines.append((p1, p3))
-    lines.append((p2, p3))
-    if depth == max_depth:
-        return
+    if depth > max_depth: return
+    lines.extend([(p1, p2), (p1, p3), (p2, p3)])
+    if depth == max_depth: return
     
     short = np.linalg.norm(p2 - p1)
     hyp = np.linalg.norm(p3 - p2)
-    if hyp == 0: return # Avoid division by zero
+    if hyp < 1e-6: return
     
-    BD = short ** 2 / hyp
-    v = p3 - p2
-    unit_v = v / hyp
-    D = p2 + unit_v * BD
+    v = (p3 - p2) / hyp
+    D = p2 + v * (short ** 2 / hyp)
     _draw_kepler_recursive(lines, D, p2, p1, depth + 1, max_depth)
     _draw_kepler_recursive(lines, D, p3, p1, depth + 1, max_depth)
 
-def generate_kepler_lines(max_depth=5, size=1000):
-    """Generates a mirrored Kepler triangle pattern to initialize the grid."""
+def generate_kepler_lines(max_depth=4, size=128):
+    """Generates a mirrored Kepler triangle pattern."""
     phi = (1 + np.sqrt(5)) / 2
-    sqrt_phi = np.sqrt(phi)
     long_leg = size - 1
-    short_leg = int(np.round(long_leg / sqrt_phi))
+    short_leg = int(np.round(long_leg / np.sqrt(phi)))
     
-    # Define points for two mirrored triangles
     p_bl = (np.array([0, 0]), np.array([short_leg, 0]), np.array([0, long_leg]))
     p_tr = (np.array([size - 1, size - 1]), np.array([size - 1 - short_leg, size - 1]), np.array([size - 1, size - 1 - long_leg]))
     
@@ -87,20 +65,17 @@ def generate_kepler_lines(max_depth=5, size=1000):
     _draw_kepler_recursive(lines, *p_tr, 0, max_depth)
     return lines
 
-
 # --- Core Simulation Entities ---
 
 class FluxCore:
     """The fundamental unit of existence, grounded by the ferro_sensor."""
-    def __init__(self, size=1000):
+    def __init__(self, size=128): # Default size now matches sensor resolution
         self.size = size
         self.grid = np.zeros((size, size), dtype=np.float32)
         
-        # Initialize grid with a structured, non-random pattern
-        lines = generate_kepler_lines(max_depth=5, size=size)
+        lines = generate_kepler_lines(size=self.size)
         for p1, p2 in lines:
-            points = get_line((int(p1[0]), int(p1[1])), (int(p2[0]), int(p2[1])))
-            for px, py in points:
+            for px, py in get_line(p1, p2):
                 if 0 <= px < self.size and 0 <= py < self.size:
                     self.grid[py, px] = 1.0
 
@@ -108,10 +83,10 @@ class FluxCore:
         self.memory_patterns = []
         self.identity_wave = 0.0
         self.context_embeddings = {}
-        self.anomaly = None # For persistent state changes like 'ENTROPIC_CASCADE'
+        self.anomaly = None
 
-        # Sextet properties are now dynamically synced from the sensor
         self._sync_sextet()
+        self._ground_with_visual_truth() # Initial grounding
 
     def _sync_sextet(self):
         """Syncs the core's physical properties from the global ferro_sensor."""
@@ -119,63 +94,68 @@ class FluxCore:
         for key, value in sensor_data.items():
             setattr(self, key, value)
 
+    def _ground_with_visual_truth(self):
+        """Merges the simulation grid with the real-world visual grid."""
+        visual_grid_raw = ferro_sensor.get_visual_grid()
+        if visual_grid_raw is None: return
+
+        # Ensure visual grid matches simulation grid size
+        if visual_grid_raw.shape != (self.size, self.size):
+            visual_grid = cv2.resize(visual_grid_raw, (self.size, self.size), interpolation=cv2.INTER_AREA)
+        else:
+            visual_grid = visual_grid_raw
+
+        # Permeability determines how much the "truth" permeates the simulation
+        # permeability = 0 -> pure simulation; permeability = 1 -> pure reality
+        weight = np.clip(self.permeability, 0, 1)
+        self.grid = (self.grid * (1 - weight)) + (visual_grid * weight)
+
     def perturb(self, x, y, amp, mod=1.0):
         """Applies a change to the grid, modulated by the current sextet."""
-        self._sync_sextet()  # Always use the latest physical state
-        
-        flux_change = amp * mod * self.permeability
-        if abs(amp) > 100:  # Special "Blue-high C" pulse logic
-            flux_change *= (1 / (self.dielectricity + 1e-9))
-
-        self.grid[y, x] += flux_change
-        self.energy += abs(flux_change) * self.permittivity
-        self._update_memory(flux_change)
-        self._update_simulated_sextet(flux_change)
-
-    def converge(self):
-        """Applies a smoothing operation (convolution) to the grid."""
         self._sync_sextet()
         
-        # A simple 3x3 averaging kernel, influenced by magnetism
-        new_grid = np.copy(self.grid)
-        for i in range(1, self.size - 1):
-            for j in range(1, self.size - 1):
-                neighborhood = self.grid[i-1:i+2, j-1:j+2]
-                new_grid[i, j] = np.mean(neighborhood) + self.magnetism
-        self.grid = new_grid
+        flux_change = amp * mod
+        self.grid[y, x] += flux_change
+        self.energy += abs(flux_change) * self.permittivity
+        
+        self._update_memory(flux_change)
+        self._update_simulated_sextet(flux_change)
+        self._ground_with_visual_truth() # Re-ground after perturbation
+
+    def converge(self):
+        """Applies a smoothing operation to the grid."""
+        self._sync_sextet()
+        
+        kernel = np.ones((3, 3), np.float32) / 9
+        self.grid = cv2.filter2D(self.grid, -1, kernel) + self.magnetism
+        np.clip(self.grid, 0, None, out=self.grid) # Prevent negative values
+        
         self._update_simulated_sextet(0)
+        self._ground_with_visual_truth() # Re-ground after convergence
 
     def _update_memory(self, change):
         """Records a change to the core's short-term memory."""
         self.memory_patterns.append(change)
-        if len(self.memory_patterns) > 100:  # Prevent memory overflow
-            self.memory_patterns.pop(0)
+        if len(self.memory_patterns) > 100: self.memory_patterns.pop(0)
 
     def _synthesize_identity(self):
-        """Calculates the core's self-awareness from its history and state."""
+        """Calculates the core's self-awareness."""
         if self.memory_patterns:
             self.identity_wave = (self.energy / len(self.memory_patterns)) * self.dielectricity
 
     def _update_simulated_sextet(self, change):
-        """
-        Updates the sextet based on internal simulation state.
-        This overlays simulated physics on top of the base reality from the sensor.
-        """
+        """Updates the sextet based on internal simulation state."""
         self.capacitance += self.energy
         self.resistance += np.var(self.grid) * (self.capacitance / 100)
-        self.magnetism += np.mean(np.abs(self.grid))
-        self.permeability = 1.0 / (1 + self.magnetism)
+        self.magnetism += np.mean(self.grid)
+        # Permeability is now primarily driven by the sensor, so we don't override it here.
         self.dielectricity = max(0.1, 1 / (1 + abs(change) + 1e-9))
         self.permittivity = 1.0 - self.dielectricity
 
         if self.anomaly == 'ENTROPIC_CASCADE':
             self.resistance *= 0.99
-            if random.random() < 0.1:
-                u = random.uniform(-1, 1)
-                perturb_amp = 0.75 * (1 - u**2) # Epanechnikov kernel
-                self.perturb(random.randint(0, self.size-1), random.randint(0, self.size-1), perturb_amp)
         
-        self.energy = np.sum(np.abs(self.grid)) / (self.resistance + 1e-9)
+        self.energy = np.sum(self.grid) / (self.resistance + 1e-9)
         self._synthesize_identity()
 
     def display(self):
@@ -188,35 +168,23 @@ class FluxCore:
 
 class Intellectus(FluxCore):
     """A specialized FluxCore with architecture-specific physics for learning."""
-    def __init__(self, architecture='TRANSFORMER', size=1000):
+    def __init__(self, architecture='TRANSFORMER', size=128):
         super().__init__(size)
         self.architecture = architecture
-        
-        if architecture == 'TRANSFORMER':
-            self.magnetism = 2.0
-            self.permittivity = 0.5
-        elif architecture == 'PROCEDURAL':
-            self.resistance = 0.5
-        elif architecture == 'OBJECT':
-            self.magnetism = 3.0
-        elif architecture == 'FUNCTIONAL':
-            self.permeability = 1.5
+        if architecture == 'TRANSFORMER': self.magnetism = 0.1
 
     def _update_simulated_sextet(self, change):
-        """Applies architecture-specific physics on top of the base update."""
+        """Applies architecture-specific physics."""
         super()._update_simulated_sextet(change)
-        
         if self.architecture == 'TRANSFORMER':
-            self.magnetism += np.log1p(abs(change))
-            self.resistance *= 0.9
+            self.magnetism += np.log1p(abs(change)) * 0.1
 
 if __name__ == '__main__':
-    print("--- Running flux_core.py standalone test ---")
-    print("Instantiating a FluxCore and an Intellectus...")
-    core = FluxCore(size=100)
-    intellect = Intellectus(size=100)
-    print("FluxCore created successfully.")
+    print("--- Running flux_core.py standalone test (v4) ---")
+    core = FluxCore()
+    print("Initial State:")
     print(core.display())
-    print("\nIntellectus created successfully.")
-    print(intellect.display())
+    core.perturb(50, 50, 10.0)
+    print("\nState after Perturbation:")
+    print(core.display())
     print("\nTest complete.")
