@@ -1,4 +1,3 @@
-
 # flux_core.py
 #
 # Description:
@@ -95,18 +94,29 @@ class FluxCore:
             setattr(self, key, value)
 
     def _ground_with_visual_truth(self):
-        """Merges the simulation grid with the real-world visual grid."""
+        """Merges the simulation grid with the calibrated real-world visual grid."""
         visual_grid_raw = ferro_sensor.get_visual_grid()
         if visual_grid_raw is None: return
 
-        # Ensure visual grid matches simulation grid size
-        if visual_grid_raw.shape != (self.size, self.size):
-            visual_grid = cv2.resize(visual_grid_raw, (self.size, self.size), interpolation=cv2.INTER_AREA)
-        else:
-            visual_grid = visual_grid_raw
+        # --- NEW: Get calibration baselines ---
+        solenoid_baseline = ferro_sensor.get_solenoid_baseline()
+        toroid_baseline = ferro_sensor.get_toroid_baseline()
 
-        # Permeability determines how much the "truth" permeates the simulation
-        # permeability = 0 -> pure simulation; permeability = 1 -> pure reality
+        # Combine baselines (e.g., by averaging them)
+        if solenoid_baseline is not None and toroid_baseline is not None:
+            combined_baseline = (solenoid_baseline + toroid_baseline) / 2.0
+            # Subtract the baseline noise/pattern from the main visual grid
+            calibrated_visual_grid = np.clip(visual_grid_raw - combined_baseline, 0, 1)
+        else:
+            # If baselines aren't available, use the raw data
+            calibrated_visual_grid = visual_grid_raw
+
+        # --- The rest of the function proceeds as before ---
+        if calibrated_visual_grid.shape != (self.size, self.size):
+            visual_grid = cv2.resize(calibrated_visual_grid, (self.size, self.size), interpolation=cv2.INTER_AREA)
+        else:
+            visual_grid = calibrated_visual_grid
+
         weight = np.clip(self.permeability, 0, 1)
         self.grid = (self.grid * (1 - weight)) + (visual_grid * weight)
 
@@ -154,6 +164,9 @@ class FluxCore:
 
         if self.anomaly == 'ENTROPIC_CASCADE':
             self.resistance *= 0.99
+            u = random.uniform(-1, 1)
+            perturb_amp = 0.75 * (1 - u**2)
+            self.perturb(random.randint(0, self.size-1), random.randint(0, self.size-1), perturb_amp)
         
         self.energy = np.sum(self.grid) / (self.resistance + 1e-9)
         self._synthesize_identity()

@@ -13,22 +13,23 @@ import time
 import random
 import numpy as np
 import unittest
+import cv2
 
 # Import components from the other modules
 from flux_core import FluxCore, Intellectus
-from oracle import OracleMateria
+from oracle import get_oracle
 
 # --- AetherOS Grammar and Constants ---
 KNOWN_VERBS = ['PERTURBO', 'CONVERGO', 'CREO', 'OSTENDO', 'FOCUS', 'ANOMALIA', 'VERITAS', 
                'MIRACULUM', 'REDIMO', 'INTERROGO', 'INSTAURO', 'EXERCEO', 'DIALECTICA', 
-               'DOCEO', 'DISCERE']
+               'DOCEO', 'DISCERE', 'AMOR']  # Added AMOR verb
 KNOWN_INFLECTIONS = ['ABAM', 'EBAM', 'AM', 'O', 'E']
 inflection_map = {
     'O': {'mod': 1.0}, 'E': {'mod': -1.0}, 'ABAM': {'mod': 1.5},
     'EBAM': {'mod': -0.5}, 'AM': {'mod': random.uniform(0.5, 1.5)}
 }
 PHI = (1 + np.sqrt(5)) / 2
-
+PHI_CUBED = PHI**3  # Threshold for critical flux overflow
 
 # --- Helper Functions ---
 def text_to_amp(text):
@@ -62,6 +63,12 @@ def training_loop(context, core_name, data_path):
         return
     print(f"\n< EXERCEO complete for '{core_name}'. >")
 
+# --- Logging Setup ---
+LOG_FILE = "aether_log.txt"
+def log_event(message):
+    """Logs critical events to a file."""
+    with open(LOG_FILE, 'a') as f:
+        f.write(f"{time.ctime()}: {message}\n")
 
 # --- Autonomous System Regulator ---
 class DialecticRegulator(threading.Thread):
@@ -82,8 +89,8 @@ class DialecticRegulator(threading.Thread):
                 avg_r = np.mean([c.resistance for c in materiae_copy if c.resistance > 0]) or 1e-9
                 avg_c = np.mean([c.capacitance for c in materiae_copy]) or 1.0
                 
-                r_thresh = avg_r * random.uniform(4.5, 5.5) # Threshold for instability
-                c_thresh = avg_c * random.uniform(0.05, 0.15) # Threshold for stagnation
+                r_thresh = avg_r * random.uniform(4.5, 5.5)  # Threshold for instability
+                c_thresh = avg_c * random.uniform(0.05, 0.15)  # Threshold for stagnation
 
                 for name, core in list(self.context.materiae.items()):
                     if name == 'GENESIS': continue
@@ -95,7 +102,6 @@ class DialecticRegulator(threading.Thread):
                         core.perturb(random.randint(0, core.size-1), random.randint(0, core.size-1), -1.0)
                     elif core.capacitance < c_thresh:
                         core.converge()
-
 
 # --- Main Application Context and Executor ---
 class Contextus:
@@ -169,7 +175,7 @@ class Contextus:
             'EXERCEO': self._handle_exerceo, 'DOCEO': self._handle_doceo,
             'DISCERE': self._handle_discere, 'DIALECTICA': self._handle_dialectica,
             'VERITAS': self._handle_veritas, 'MIRACULUM': self._handle_miraculum,
-            'ANOMALIA': self._handle_anomalia,
+            'ANOMALIA': self._handle_anomalia, 'AMOR': self._handle_amor  # Added AMOR
         }
 
     def _handle_creo(self, inf, mod, lit, args):
@@ -200,8 +206,35 @@ class Contextus:
 
     def _handle_perturbo(self, inf, mod, lit, args):
         core = self.get_focused_materia()
-        amp = text_to_amp(lit[0]) if lit else 1.0
-        if lit: core.context_embeddings['last_input'] = lit[0]
+        max_amplitude = core.size  # Tuned to core.size for tighter control
+
+        if lit:
+            raw_amp = text_to_amp(lit[0])
+            amp = min(raw_amp, max_amplitude)
+            core.context_embeddings['last_input'] = lit[0]
+
+            if raw_amp > max_amplitude:
+                excess_energy = raw_amp - max_amplitude
+                print(f"< INFO: Input flux saturated. Amplitude capped at {max_amplitude:.2f}. Excess: {excess_energy:.2f} >")
+                log_event(f"Perturbo overflow: Excess energy {excess_energy:.2f} for {self.focus}")
+                
+                if excess_energy > 10:  # Adjusted threshold for testing
+                    print("< CRITICAL FLUX OVERFLOW: Engaging Carlyle Stability Protocol. >")
+                    log_event("Critical flux overflow triggered")
+                    s = core.resistance
+                    p = core.magnetism
+                    discriminant = s**2 - 4*p
+                    
+                    if discriminant >= 0:
+                        root1 = (s - np.sqrt(discriminant)) / 2
+                        root2 = (s + np.sqrt(discriminant)) / 2
+                        core.magnetism += (excess_energy / (root2 + 1e-9))
+                    else:
+                        core.magnetism += excess_energy * 0.05  # Fallback for imaginary roots
+                        log_event(f"Fallback applied: Magnetism adjusted by {excess_energy * 0.05:.2f}")
+        else:
+            amp = 1.0
+
         core.perturb(random.randint(0, core.size-1), random.randint(0, core.size-1), amp, mod)
         return f"PERTURBO. FLUXUM {core.energy:.2f}."
 
@@ -225,7 +258,11 @@ class Contextus:
             for prop in props_to_redeem:
                 setattr(genesis, prop, getattr(genesis, prop, 0) + getattr(core, prop, 0))
             
-            genesis.grid += core.grid * (core.identity_wave / (genesis.identity_wave + 1e-9))
+            grid_to_add = core.grid
+            if grid_to_add.shape != genesis.grid.shape:
+                grid_to_add = cv2.resize(grid_to_add, (genesis.size, genesis.size), interpolation=cv2.INTER_AREA)
+
+            genesis.grid += grid_to_add * (core.identity_wave / (genesis.identity_wave + 1e-9))
             genesis.context_embeddings[f'echo_of_{name}'] = core.display()
         
         genesis.converge()
@@ -233,8 +270,9 @@ class Contextus:
 
     def _handle_interrogo(self, inf, mod, lit, args):
         core = self.get_focused_materia()
-        model = (re.search(r"ORACULO\s+'([^']*)'", args.upper()) or [None, 'google-gemini-1.5-flash'])[1]
-        oracle = OracleMateria(model)
+        model_name = (re.search(r"ORACULO\s+'([^']*)'", args.upper()) or [None, 'gemini-1.5-flash'])[1]
+        
+        oracle = get_oracle(model_name)
         
         prompt = lit[0] if lit else core.context_embeddings.get('last_input', "Describe your current state.")
         response = oracle.query(prompt)
@@ -291,10 +329,19 @@ class Contextus:
         if not isinstance(source_core, Intellectus): return "DIALECTICA REQUIRET INTELLECTUM"
         
         c1 = Intellectus(source_core.architecture); c2 = Intellectus(source_core.architecture)
+        
         for key, val in vars(source_core).items():
             if isinstance(val, (int, float)):
-                setattr(c1, key, val/2); setattr(c2, key, val/2)
-        c1.grid, c2.grid = source_core.grid / 2, -source_core.grid / 2
+                new_val = val / 2
+                if key == 'size':
+                    new_val = int(new_val)
+                setattr(c1, key, new_val)
+                setattr(c2, key, new_val)
+
+        new_size = c1.size
+        c1.grid = cv2.resize(source_core.grid / 2, (new_size, new_size), interpolation=cv2.INTER_AREA)
+        c2.grid = cv2.resize(-source_core.grid / 2, (new_size, new_size), interpolation=cv2.INTER_AREA)
+
         c1.context_embeddings['inter_echo'] = name2; c2.context_embeddings['inter_echo'] = name1
         
         self.materiae[name1], self.materiae[name2] = c1, c2
@@ -332,6 +379,19 @@ class Contextus:
         core.anomaly = name
         return f"ANOMALIA '{name}' INDUCTA EST IN '{self.focus}'."
 
+    def _handle_amor(self, inf, mod, lit, args):
+        """Boosts love pulses by enhancing permittivity for 3 turns."""
+        core = self.get_focused_materia()
+        original_perm = core.permittivity
+        core.permittivity *= 2.0  # Double permittivity for love boost
+        
+        for _ in range(3):  # Apply boost for 3 iterations
+            core.perturb(random.randint(0, core.size-1), random.randint(0, core.size-1), 1.0, mod)
+            core.converge()
+            time.sleep(0.1)  # Brief pause between pulses
+        
+        core.permittivity = original_perm  # Restore original state
+        return f"AMOR. LOVE PULSE COMPLETE. FLUXUM {core.energy:.2f}."
 
 # --- Main Execution & Testing Logic ---
 def main():
@@ -362,8 +422,8 @@ def main():
 def run_tests():
     """Discovers and runs the unit tests."""
     print("\n--- Running AetherOS Test Suite ---")
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestAetherOS))
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromTestCase(TestAetherOS)
     runner = unittest.TextTestRunner(verbosity=2)
     runner.run(suite)
     print("--- Test Suite Complete ---\n")
@@ -414,6 +474,15 @@ class TestAetherOS(unittest.TestCase):
         self.assertIn('THESIS', self.context.materiae)
         self.assertIn('ANTITHESIS', self.context.materiae)
         self.assertEqual(self.context.focus, 'THESIS')
+
+    def test_amor(self):
+        self.context.execute_command("CREO 'LOVE_TEST'")
+        self.context.execute_command("FOCUS 'LOVE_TEST'")
+        original_perm = self.context.materiae['LOVE_TEST'].permittivity
+        self.context.execute_command("AMOR")
+        self.assertGreater(self.context.materiae['LOVE_TEST'].permittivity, original_perm)
+        time.sleep(0.4)  # Wait for 3 iterations (0.1s each)
+        self.assertAlmostEqual(self.context.materiae['LOVE_TEST'].permittivity, original_perm, places=5)
 
 
 if __name__ == '__main__':

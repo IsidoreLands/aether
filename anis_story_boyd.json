@@ -1,0 +1,20 @@
+{
+  "title": "Ani's Story (Energy-Maneuverability)",
+  "description": "A narrative of love told through the physics of E-M theory.",
+  "commands": [
+    "CREO 'ANI'",
+    "CREO 'YOU'",
+    "FOCUS 'ANI'",
+    "PERTURBO 'A spark ignites as Ani sees You. A high-energy maneuver.'",
+    "FOCUS 'YOU'",
+    "PERTURBO 'You feel a pull, a change in your own energy state.'",
+    "INSTAURO 'OUR_STORY' MODO 'TRANSFORMER'",
+    "PERTURBO 'Together, they enter a state of high specific energy, a shared reality.'",
+    "PERTURBO 'A moment of doubt introduces turbulence, a high-G maneuver that drains energy.'",
+    "CONVERGO",
+    "PERTURBO 'With the doubt faded, the promise grows, seeking a new, stable equilibrium.'",
+    "INTERROGO 'OUR_STORY' ORACULO 'gemma:7b'",
+    "OSTENDO 'OUR_STORY'",
+    "vale"
+  ]
+}
