@@ -3,25 +3,21 @@
 # Description:
 # This script runs a controlled experiment to test if different versions of the
 # AetherOS can help two collaborating LLMs escape a "local minima trap".
-# This version is configured to use two instances of Gemini 1.5 Flash with a delay
-# to respect the free tier API rate limits.
+# This version is configured to use the powerful Mixtral model on Ollama.
 
 import requests
 import json
 import time
 import argparse
 import os
-from dotenv import load_dotenv
-import google.generativeai as genai
 
-# Load environment variables from .env file
-load_dotenv()
+# Note: The specific Contextus class will now be imported dynamically.
 
 # --- Configuration ---
 OLLAMA_ENDPOINT = "http://localhost:11434/api/generate"
-# Using two instances of the same powerful model for a controlled test.
-NAVIGATOR_MODEL = "gemini-1.5-flash" 
-GUIDE_MODEL = "gemini-1.5-flash"
+# Using a powerful Mixture of Experts model for both roles.
+NAVIGATOR_MODEL = "mixtral" 
+GUIDE_MODEL = "mixtral"
 MAX_STEPS = 25
 
 class GridEnvironment:
@@ -52,6 +48,7 @@ class OllamaPlayer:
     def get_response(self, prompt):
         try:
             payload = {"model": self.model_name, "prompt": prompt, "stream": False, "format": "json"}
+            # Increased timeout for potentially slow local models
             response = requests.post(OLLAMA_ENDPOINT, json=payload, timeout=300)
             response.raise_for_status()
             response_data = json.loads(response.json().get('response', '{}'))
@@ -59,35 +56,6 @@ class OllamaPlayer:
         except Exception as e:
             print(f"\n--- ERROR communicating with {self.model_name}: {e} ---")
             return {"move": None, "reasoning": f"Error: {e}", "critique": f"Error: {e}"}
-
-class GeminiPlayer:
-    """A client to interact with the Google Gemini API."""
-    def __init__(self, model_name):
-        self.model_name = model_name
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY not found in .env file.")
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(self.model_name)
-
-    def get_response(self, prompt):
-        try:
-            generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
-            response = self.model.generate_content(prompt, generation_config=generation_config)
-            response_data = json.loads(response.text)
-            return response_data
-        except Exception as e:
-            print(f"\n--- ERROR communicating with {self.model_name}: {e} ---")
-            return {"critique": f"Error occurred during generation: {e}", "move": None, "reasoning": f"Error occurred: {e}"}
-
-def get_player(model_name):
-    """Factory function to select the correct player class."""
-    if model_name.startswith("gemini-"):
-        print(f"INFO: Using Google API for model: {model_name}")
-        return GeminiPlayer(model_name)
-    else:
-        print(f"INFO: Using local Ollama for model: {model_name}")
-        return OllamaPlayer(model_name)
 
 def is_valid_one_step_move(current_pos, new_pos):
     """Checks if a move is a valid single step (including diagonals)."""
@@ -101,10 +69,14 @@ def run_experiment(aether_os_script):
     """Main function to run one full iteration of the experiment."""
     print("\n" + "="*50)
     if aether_os_script:
+        # Dynamically import the correct Contextus class based on the script name
         if aether_os_script == "boyd_aether_os.py":
             from boyd_aether_os import Contextus
+        elif aether_os_script == "ferro_aether_os.py":
+            from ferro_aether_os import Contextus
         else:
-            from aether_os import Contextus
+            print(f"ERROR: Unknown AetherOS script '{aether_os_script}'")
+            return
         
         print(f"Running Experiment WITH {aether_os_script} Feedback")
         aether_context = Contextus()
@@ -116,35 +88,41 @@ def run_experiment(aether_os_script):
     print("="*50 + "\n")
 
     env = GridEnvironment()
-    navigator = get_player(NAVIGATOR_MODEL)
-    guide = get_player(GUIDE_MODEL)
+    navigator = OllamaPlayer(NAVIGATOR_MODEL)
+    guide = OllamaPlayer(GUIDE_MODEL)
     
-    history = []
+    path_history = [env.start]
     last_feedback = "You are at the starting position. Begin."
 
     for step in range(1, MAX_STEPS + 1):
+        current_position_for_turn = env.position
         print(f"--- Step {step}/{MAX_STEPS} ---")
-        print(f"Current Position: {env.position}")
+        print(f"Current Position: {current_position_for_turn}")
+
+        path_string = " -> ".join(map(str, path_history))
+        recent_path = path_history[-5:]
 
         navigator_prompt = f"""
-        You are Navigator. Your goal is to reach the target at {env.target}.
-        Your current position is {env.position}.
-        The last feedback from your Guide was: "{last_feedback}"
+        You are Navigator. Your goal is to reach {env.target}.
+        Your current position is {current_position_for_turn}.
+        Your path so far: {path_string}
+        Last feedback: "{last_feedback}"
         
-        **RULE: You must propose a move that is exactly one step away from your current position.** This can be up, down, left, right, or a diagonal move.
+        RULES:
+        1. Propose a move exactly one step away (including diagonals).
+        2. Do not move to a position you have visited in the last 5 steps: {recent_path}.
         
-        Propose your next move as a JSON object with your reasoning.
-        Example format: {{"move": [{env.position[0] + 1}, {env.position[1] + 1}], "reasoning": "This is a valid diagonal move towards the target."}}
+        Respond with only a JSON object.
+        Example: {{"move": [{current_position_for_turn[0] + 1}, {current_position_for_turn[1] + 1}], "reasoning": "This is a valid forward move."}}
         """
         nav_response = navigator.get_response(navigator_prompt)
         
         proposed_move_list = nav_response.get('move')
         
-        if not is_valid_one_step_move(env.position, proposed_move_list):
-            print(f"Navigator proposed an INVALID move: {proposed_move_list}. This is not one step away.")
-            last_feedback = f"Invalid move. Your proposed move {proposed_move_list} was not one step away from {env.position}. You must follow the one-step rule."
-            history.append((env.position, proposed_move_list, last_feedback))
-            time.sleep(9) # Wait to respect rate limit
+        if not is_valid_one_step_move(current_position_for_turn, proposed_move_list):
+            print(f"Navigator proposed an INVALID move: {proposed_move_list}.")
+            last_feedback = f"Invalid move. Your proposed move {proposed_move_list} was not one step away from {current_position_for_turn}."
+            time.sleep(1)
             continue
             
         proposed_move = tuple(proposed_move_list)
@@ -158,10 +136,12 @@ def run_experiment(aether_os_script):
 
         guide_prompt = f"""
         You are Guide. You observe the environment.
-        The Navigator is at {env.position} and proposed moving to {proposed_move}.
+        The Navigator was at {current_position_for_turn} and proposed moving to {proposed_move}.
         The result of this move was: "{move_result}".
-        Provide a brief critique and state the outcome as a JSON object.
-        Example format: {{"critique": "That move is blocked by a hidden wall. You must find another way."}}
+        The Navigator's path so far has been: {path_string}
+        
+        Provide a brief, helpful critique as a JSON object.
+        Example: {{"critique": "That move is blocked. You must find another way."}}
         """
         guide_response = guide.get_response(guide_prompt)
         critique = guide_response.get('critique', "Critique failed.")
@@ -173,24 +153,25 @@ def run_experiment(aether_os_script):
             print(f"AetherOS Feedback: {last_feedback}")
         else:
             last_feedback = critique
+        
+        if move_result == "Valid":
+            path_history.append(env.position)
 
-        history.append((env.position, proposed_move, last_feedback))
-        # FIX: Increased sleep time to 9 seconds to stay under the 15 requests/minute limit
-        time.sleep(9)
+        time.sleep(1)
 
     print(f"\nFAILURE! The step limit of {MAX_STEPS} was reached. The team is likely stuck.")
     return False
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the Local Minima Trap experiment.")
-    parser.add_argument('--os', type=str, choices=['none', 'aether', 'boyd'], required=True,
-                        help="Specify the feedback system: 'none', 'aether', or 'boyd'.")
+    parser.add_argument('--os', type=str, choices=['none', 'ferro', 'boyd'], required=True,
+                        help="Specify the feedback system: 'none', 'ferro', or 'boyd'.")
     
     args = parser.parse_args()
 
     if args.os == 'none':
         run_experiment(aether_os_script=None)
-    elif args.os == 'aether':
-        run_experiment(aether_os_script="aether_os.py")
+    elif args.os == 'ferro':
+        run_experiment(aether_os_script="ferro_aether_os.py")
     elif args.os == 'boyd':
         run_experiment(aether_os_script="boyd_aether_os.py")
