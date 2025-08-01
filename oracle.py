@@ -1,9 +1,4 @@
-# oracle.py
-#
-# Description:
-# This module provides a universal conduit to external and internal computational
-# plenums. It can intelligently select between the Google Gemini API for remote
-# queries and a local Ollama instance for other models.
+#!/usr/bin/env python3
 
 import os
 import json
@@ -19,7 +14,6 @@ class Oracle:
         self.model_name = model_name
 
     def query(self, prompt_str):
-        """Sends a query and returns a string response. Must be implemented by subclasses."""
         raise NotImplementedError("Query method must be implemented by a subclass.")
 
 # --- Google Gemini API Oracle ---
@@ -31,7 +25,7 @@ class GeminiOracle(Oracle):
         self.api_key = os.getenv("GEMINI_API_KEY")
         self.endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
         if not self.api_key:
-            print("WARN: GEMINI_API_KEY not found. GeminiOracle will fail.")
+            print("WARN: GEMINI_API_KEY not found. Falling back to Ollama if available.")
         
     def query(self, prompt_str):
         if not self.api_key:
@@ -64,7 +58,10 @@ class OllamaOracle(Oracle):
 
     def query(self, prompt_str):
         try:
-            # FIX: Increased timeout to 300 seconds (5 minutes) for local models
+            # Check if Ollama is running
+            response = requests.get(self.endpoint.rsplit('/', 1)[0] + '/tags', timeout=5)
+            if response.status_code != 200:
+                return "ORACULUM ERRORUM: Ollama not running or inaccessible."
             payload = {"model": self.model_name, "prompt": prompt_str, "stream": False}
             response = requests.post(self.endpoint, json=payload, timeout=300)
             response.raise_for_status()
@@ -82,7 +79,11 @@ def get_oracle(model_name):
     
     # Add any other specific API models here in the future
     if model_name.startswith("gemini-"):
-        return GeminiOracle(model_name)
+        oracle = GeminiOracle(model_name)
+        # Fallback to Ollama if Gemini key is missing
+        if not oracle.api_key:
+            return OllamaOracle(model_name)
+        return oracle
     else:
         # Default to Ollama for all other models
         return OllamaOracle(model_name)

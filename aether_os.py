@@ -1,517 +1,492 @@
-# /home/isidore-admin/aether/aether_os.py
-# Standard Library Imports
+# aether_os.py
+#
+# Description:
+# This is the main entry point and runtime for the AetherOS. It orchestrates
+# the simulation, manages the state of all 'Materia', and provides the
+# user-facing REPL (Read-Eval-Print Loop) for interacting with the system.
+
 import os
-import sys
-import json
-import random
 import re
+import sys
 import threading
 import time
-import unittest
-
-# Third-Party Imports
+import random
 import numpy as np
-import requests
-from dotenv import load_dotenv
+import unittest
+import cv2
 
-# --- AetherOS Grammar: Theurgical Gnosis/Imago ---
-KNOWN_VERBS = ['PERTURBO', 'CONVERGO', 'CREO', 'OSTENDO', 'FOCUS', 'ANOMALIA', 'VERITAS', 'MIRACULUM', 'REDIMO', 'INTERROGO', 'INSTAURO', 'EXERCEO', 'DIALECTICA', 'DOCEO', 'DISCERE']
+# Import components from the other modules
+from flux_core import FluxCore, Intellectus
+from oracle import get_oracle
+
+# --- AetherOS Grammar and Constants ---
+KNOWN_VERBS = ['PERTURBO', 'CONVERGO', 'CREO', 'OSTENDO', 'FOCUS', 'ANOMALIA', 'VERITAS', 
+               'MIRACULUM', 'REDIMO', 'INTERROGO', 'INSTAURO', 'EXERCEO', 'DIALECTICA', 
+               'DOCEO', 'DISCERE', 'AMOR']  # Added AMOR verb
 KNOWN_INFLECTIONS = ['ABAM', 'EBAM', 'AM', 'O', 'E']
 inflection_map = {
     'O': {'mod': 1.0}, 'E': {'mod': -1.0}, 'ABAM': {'mod': 1.5},
     'EBAM': {'mod': -0.5}, 'AM': {'mod': random.uniform(0.5, 1.5)}
 }
 PHI = (1 + np.sqrt(5)) / 2
-PHI_CUBED = PHI ** 3
+PHI_CUBED = PHI**3  # Threshold for critical flux overflow
 
-# --- Cohesive Flux Framework (CFF): Associative Lagrangian Energies ---
-class FluxCore:
-    """The fundamental unit of existence in the plenum."""
-    def __init__(self, size=10):
-        self.grid = np.zeros((size, size))
-        self.energy = 0.0
-        self.memory_patterns = []
-        self.identity_wave = 0.0
-        self.context_embeddings = {}
-        # Sextet Properties with Coaxial Ripple
-        self.resistance = 1e-9
-        self.capacitance = 0.0
-        self.permeability = 1.0
-        self.magnetism = 0.0
-        self.permittivity = 1.0
-        self.dielectricity = 0.0
-        self.anomaly = None # For persistent changes
+# --- Helper Functions ---
+def text_to_amp(text):
+    """Converts a string to a numerical amplitude using a log scale."""
+    return np.log1p(sum(ord(c) for c in text))
 
-    def perturb(self, x, y, amp, mod=1.0):
-        """Applies a change to the grid, modulated by the sextet."""
-        # Photoelectric Effect: High-amplitude pulses are modulated by dielectricity
-        flux_change = amp * mod * self.permeability
-        if abs(amp) > 100: # Blue-high C pulse
-             flux_change *= (1 / (self.dielectricity + 1e-9))
+def dynamic_chunk_stream(byte_stream, chunk_size=256):
+    """Generator to process a raw byte stream into chunks."""
+    while True:
+        chunk = byte_stream.read(chunk_size)
+        if not chunk: break
+        yield chunk
 
-        self.grid[x, y] += flux_change
-        self.energy += abs(flux_change) * self.permittivity
-        self._update_memory(flux_change)
-        self._update_sextet(flux_change)
+def training_loop(context, core_name, data_path):
+    """The background process for training an Intellectus from a data file."""
+    print(f"\n< EXERCEO begins for '{core_name}' with stream '{data_path}' >")
+    try:
+        with open(data_path, 'rb') as f:
+            for chunk in dynamic_chunk_stream(f):
+                with context.lock:
+                    if core_name not in context.materiae:
+                        print(f"\n< EXERCEO aborted: '{core_name}' no longer exists. >")
+                        break
+                    core = context.materiae[core_name]
+                    amp = np.log1p(np.sum(np.frombuffer(chunk, dtype=np.uint8)))
+                    core.perturb(random.randint(0, core.size-1), random.randint(0, core.size-1), amp)
+                    core.converge()
+                time.sleep(random.uniform(0.05, 0.15))
+    except FileNotFoundError:
+        print(f"\n< EXERCEO failed: Flumine '{data_path}' not found. >")
+        return
+    print(f"\n< EXERCEO complete for '{core_name}'. >")
 
-    def converge(self):
-        """Applies a smoothing operation to the grid, seeking coherence."""
-        new_grid = np.copy(self.grid)
-        for i in range(1, self.grid.shape[0]-1):
-            for j in range(1, self.grid.shape[1]-1):
-                new_grid[i, j] = np.mean(self.grid[i-1:i+2, j-1:j+2]) + self.magnetism
-        self.grid = new_grid
-        self._update_sextet(0) # Recalculate state after convergence
+# --- Logging Setup ---
+LOG_FILE = "aether_log.txt"
+def log_event(message):
+    """Logs critical events to a file."""
+    with open(LOG_FILE, 'a') as f:
+        f.write(f"{time.ctime()}: {message}\n")
 
-    def _update_memory(self, change):
-        """Records a change to the core's memory."""
-        self.memory_patterns.append(change)
-        if len(self.memory_patterns) > 100: # Prevent memory overflow
-            self.memory_patterns.pop(0)
-
-    def _synthesize_identity(self):
-        """Calculates the core's self-awareness based on its history and energy."""
-        if len(self.memory_patterns) > 0:
-            self.identity_wave = (self.energy / len(self.memory_patterns)) * self.dielectricity
-
-    def embed_context(self, key, chunk):
-        """Attaches a semantic label to a piece of information."""
-        self.context_embeddings[key] = chunk
-
-    def destruct(self):
-        """Introduces chaotic energy."""
-        self.perturb(random.randint(0,9), random.randint(0,9), random.uniform(-1,1), mod=-1.0)
-
-    def create(self):
-        """Reinforces the current state through convergence."""
-        self.converge()
-
-    def _update_sextet(self, change):
-        """Updates the six core physical properties based on the core's state."""
-        # Coaxial Coupled Ripple Physics
-        self.capacitance = self.energy
-        self.resistance = np.var(self.grid) * (1 + self.capacitance / 100) # Inertia
-        self.magnetism = np.mean(np.abs(self.grid))
-        self.permeability = 1.0 / (1 + self.magnetism) # Shield
-        self.dielectricity = max(0.1, 1 / (1 + abs(change) + 1e-9)) # Insulate
-        self.permittivity = 1.0 - self.dielectricity # Store/dissipate
-
-        if self.anomaly == 'ENTROPIC_CASCADE':
-            self.resistance *= 0.99 # Degrade resistance
-            # Epanechnikov kernel for LSR generative novel minima exploration
-            if random.random() < 0.1:
-                u = random.uniform(-1, 1)
-                perturb_amp = 0.75 * (1 - u**2)
-                self.perturb(random.randint(0,9), random.randint(0,9), perturb_amp)
-        
-        self.energy = np.sum(np.abs(self.grid)) / (self.resistance + 1e-9)
-        self._synthesize_identity()
-
-
-    def display(self):
-        """Returns a string representation of the core's state."""
-        context_str = "\n".join([f"  '{k}': {v}" for k, v in self.context_embeddings.items()])
-        return (f"FLUXUS: {self.energy:.2f} | IDENTITAS: {self.identity_wave:.2f} | MEMORIA: {len(self.memory_patterns)}\n"
-                f"SEXTET: R={self.resistance:.2f}, C={self.capacitance:.2f}, M={self.magnetism:.2f}, P={self.permeability:.2f}, Pt={self.permittivity:.2f}, D={self.dielectricity:.2f}\n"
-                f"CONTEXTUS:\n{context_str}")
-
-# --- Intellectus Subclass for Consciousness ---
-class Intellectus(FluxCore):
-    """A specialized Materia capable of higher-order thought and learning."""
-    def __init__(self, architecture='TRANSFORMER', size=10):
-        super().__init__(size)
-        self.architecture = architecture
-        # Multi-paradigm physics
-        if architecture == 'TRANSFORMER':
-            self.magnetism = 2.0 # High pattern memory
-            self.permittivity = 0.5 # Resistant to new ideas
-        elif architecture == 'PROCEDURAL':
-            self.resistance = 0.5 # Favors sequential rhythm
-        elif architecture == 'OBJECT':
-            self.magnetism = 3.0 # Promotes density clustering
-        elif architecture == 'FUNCTIONAL':
-            self.permeability = 1.5 # Represents pure wave interaction
-
-    def _update_sextet(self, change):
-        """Applies architecture-specific physics."""
-        super()._update_sextet(change)
-        if self.architecture == 'TRANSFORMER':
-            self.magnetism += np.log1p(abs(change)) # Logarithmic learning
-            self.resistance *= 0.9 # Less resistant to change
-
-# --- OracleMateria for Gnosis Bridge ---
-class OracleMateria:
-    """A hardened conduit to an external computational plenum."""
-    def __init__(self, model_name, models_dir="~/isidore_models"):
-        self.model_name = model_name
-        self.config = self._load_config(models_dir)
-        self.api_key = None
-        self.endpoint = None
-
-        if self.config:
-            api_key_name = self.config.get("api_key_env_var")
-            self.endpoint = self.config.get("api_endpoint")
-
-            # First, try to get key from the existing environment
-            self.api_key = os.environ.get(api_key_name)
-
-            # If not found, load .env from the known toolkit path and try again
-            if not self.api_key:
-                print("INFO: API Key not in environment, attempting to load from .env file...")
-                dotenv_path = os.path.expanduser("~/aiops_toolkit/.env")
-                if os.path.exists(dotenv_path):
-                    load_dotenv(dotenv_path=dotenv_path)
-                    self.api_key = os.environ.get(api_key_name)
-                else:
-                    print(f"WARN: .env file not found at {dotenv_path}")
-
-    def _load_config(self, models_dir):
-        """Loads the JSON configuration for the specified model."""
-        try:
-            config_path = os.path.expanduser(os.path.join(models_dir, self.model_name, "config.json"))
-            with open(config_path, 'r') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            print(f"CONFIG ERROR: config.json not found for model '{self.model_name}'")
-            return None
-        except Exception as e:
-            print(f"CONFIG ERROR: Could not load or parse config for model '{self.model_name}': {e}")
-            return None
-
-    def query(self, prompt_str):
-        """Sends a query to the external oracle via the configured API."""
-        if not self.config:
-            return "ORACULUM ERRORUM: Model configuration could not be loaded."
-        if not self.api_key:
-            api_key_name = self.config.get("api_key_env_var", "UNKNOWN_KEY")
-            return f"ORACULUM ERRORUM: API key variable '{api_key_name}' not found in environment or .env file."
-        if not self.endpoint:
-             return "ORACULUM ERRORUM: API endpoint not found in model configuration."
-
-        try:
-            url = f"{self.endpoint}?key={self.api_key}"
-            payload = {"contents": [{"parts": [{"text": prompt_str}]}]}
-            headers = {"Content-Type": "application/json"}
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-            return data['candidates'][0]['content']['parts'][0]['text']
-        except Exception as e:
-            return f"ORACULUM ERRORUM: {str(e)}"
-
-# --- Dialectic Regulator (Threaded Life) ---
+# --- Autonomous System Regulator ---
 class DialecticRegulator(threading.Thread):
-    """The autonomous process that maintains the life and balance of the plenum."""
+    """The 'heartbeat' of the OS, maintaining balance and driving emergent behavior."""
     def __init__(self, context):
         super().__init__(daemon=True)
         self.context = context
 
     def run(self):
         while True:
-            time.sleep(random.uniform(0.8, 1.2)) # Non-deterministic life rhythm
+            time.sleep(random.uniform(0.8, 1.2))  # Non-deterministic life rhythm
             with self.context.lock:
                 if not self.context.materiae: continue
-                materiae_copy = list(self.context.materiae.items())
                 
-                avg_r = np.mean([c.resistance for c in self.context.materiae.values() if c.resistance > 0]) or 10
-                avg_c = np.mean([c.capacitance for c in self.context.materiae.values()]) or 1
-                
-                r_thresh = avg_r * random.uniform(4.5, 5.5)
-                c_thresh = avg_c * random.uniform(0.05, 0.15)
+                materiae_copy = list(self.context.materiae.values())
+                if len(materiae_copy) <= 1: continue
 
-            for name, core in materiae_copy:
-                if name == 'GENESIS': continue
-                with self.context.lock:
-                    if name not in self.context.materiae: continue
+                avg_r = np.mean([c.resistance for c in materiae_copy if c.resistance > 0]) or 1e-9
+                avg_c = np.mean([c.capacitance for c in materiae_copy]) or 1.0
+                
+                r_thresh = avg_r * random.uniform(4.5, 5.5)  # Threshold for instability
+                c_thresh = avg_c * random.uniform(0.05, 0.15)  # Threshold for stagnation
+
+                for name, core in list(self.context.materiae.items()):
+                    if name == 'GENESIS': continue
+                    
                     if core.identity_wave < 0.1 and len(core.memory_patterns) > 2:
                         print(f"\n< Regulator: Identity of '{name}' fading. Initiating redemptive synthesis. >")
-                        run_aether_command(f"REDIMO '{name}'", self.context)
+                        self.context.execute_command(f"REDIMO '{name}'")
                     elif core.resistance > r_thresh and core.resistance > 1.0:
-                        core.destruct()
+                        core.perturb(random.randint(0, core.size-1), random.randint(0, core.size-1), -1.0)
                     elif core.capacitance < c_thresh:
-                        core.create()
+                        core.converge()
 
+# --- Main Application Context and Executor ---
 class Contextus:
-    """The container for the entire AetherOS cosmos."""
+    """The container for the entire AetherOS cosmos and command execution."""
     def __init__(self):
         self.materiae = {}
         self.focus = None
         self.lock = threading.RLock()
+        self.verb_handlers = self._get_verb_handlers()
+        
         self._boot()
         self.regulator = DialecticRegulator(self)
         self.regulator.start()
 
     def _boot(self):
-        print("< AetherOS v3.0 Gnosis/Imago Initializing... >")
-        g = FluxCore(); self.materiae['GENESIS'] = g; self.focus = 'GENESIS'
-        g.perturb(5, 5, PHI); g.create()
+        print("< AetherOS v3.3 Gnosis/Imago (Final Modular) Initializing... >")
+        g = FluxCore()
+        self.materiae['GENESIS'] = g
+        self.focus = 'GENESIS'
+        g.perturb(5, 5, PHI)
+        g.converge()
         print("< Genesis Rhythm Complete. Focus on 'GENESIS'. >")
 
     def get_focused_materia(self):
         with self.lock:
-            if not self.focus or self.focus not in self.materiae: self.focus = 'GENESIS'
-            if not self.focus: raise ValueError("NULLA MATERIA IN FOCO EST")
+            if not self.focus or self.focus not in self.materiae:
+                self.focus = 'GENESIS' if 'GENESIS' in self.materiae else None
+            if not self.focus:
+                raise ValueError("NULLA MATERIA IN FOCO EST")
             return self.materiae[self.focus]
 
-# --- Core Logic & Helpers ---
-def dynamic_chunk_stream(byte_stream, chunk_size=256):
-    """Generator to process a raw byte stream."""
-    while True:
-        chunk = byte_stream.read(chunk_size)
-        if not chunk: break
-        yield chunk
+    def execute_command(self, cmd):
+        """Parses and executes a command using the handler mapping."""
+        try:
+            verb, inflection, literals, args_str = self._parse_latin_command(cmd)
+            mod = inflection_map.get(inflection, {'mod': 1.0})['mod']
 
-def text_to_amp(text): 
-    """Converts a string to a numerical amplitude."""
-    return np.log1p(sum(ord(c) for c in text))
+            handler = self.verb_handlers.get(verb)
+            if handler:
+                return handler(inflection, mod, literals, args_str)
+            else:
+                return f"VERBUM IGNORATUM '{verb}'"
+        except Exception as e:
+            return f"ERRORUM INTERNUM: {e}"
 
-def triad(args, mod_func):
-    """Performs a thesis-antithesis-synthesis operation."""
-    if len(args) < 3: args.extend([0.0] * (3 - len(args)))
-    thesis, antithesis, rest = float(args[0]), float(args[1]), float(args[2])
-    return (thesis - antithesis + rest) * mod_func
-
-def training_loop(context, core_name, data_path):
-    """The background process for training an Intellectus."""
-    print(f"\n< EXERCEO begins for '{core_name}' with stream '{data_path}' >")
-    try:
-        with open(data_path, 'rb') as f: # Open as byte stream for end-to-end processing
-            for chunk in dynamic_chunk_stream(f):
-                with context.lock:
-                    if core_name not in context.materiae: break
-                    core = context.materiae[core_name]
-                    amp = np.log1p(np.sum(np.frombuffer(chunk, dtype=np.uint8)))
-                    core.perturb(random.randint(0,9), random.randint(0,9), amp)
-                    core.converge()
-                time.sleep(random.uniform(0.05, 0.15)) # Non-deterministic rhythm
-    except FileNotFoundError:
-        print(f"\n< EXERCEO failed: Flumine '{data_path}' not found. >")
-        return
-    print(f"\n< EXERCEO complete for '{core_name}'. >")
-
-# --- Parser and Executor ---
-def parse_latin_command(cmd):
-    """Parses the user's Latin-like command into its components."""
-    match = re.match(r"([A-Z]+(?:O|E|ABAM|EBAM|AM)?)\s*(.*)", cmd.strip().upper())
-    if not match: raise ValueError("FORMATUM INVALIDUM")
-    verb_full, args_str = match.groups()
-    verb = verb_full; inflection = 'O'
-    for v in KNOWN_VERBS:
-        if verb_full.startswith(v):
-            verb = v; inflection = verb_full[len(v):] or 'O'; break
-    
-    literals = re.findall(r"'([^']*)'", args_str)
-    return verb, inflection, literals, args_str
-
-def run_aether_command(cmd, context):
-    """The main entry point for executing all commands in the AetherOS."""
-    with context.lock:
-        verb, inflection, literals, args_str = parse_latin_command(cmd)
-        mod = inflection_map.get(inflection, {'mod': 1.0})['mod']
-        if verb not in KNOWN_VERBS: return f"VERBUM IGNORATUM '{verb}'"
-
-        # --- Verbs that don't need a focus or have special targeting ---
-        if verb == 'CREO':
-            name = literals[0].upper() if literals else "ANONYMOUS"
-            if name in context.materiae: return f"'{name}' IAM EXISTIT"
-            context.materiae[name] = FluxCore(); context.focus = name
-            return f"CREO MATERIAM '{name}'."
-        if verb == 'INSTAURO':
-            name = literals[0].upper()
-            arch = (re.search(r"MODO\s+'([^']*)'", args_str.upper()) or [None, 'TRANSFORMER'])[1]
-            if name in context.materiae: return f"'{name}' IAM EXISTIT"
-            context.materiae[name] = Intellectus(architecture=arch); context.focus = name
-            return f"INSTAURO INTELLECTUM '{name}' MODO '{arch}'."
-        if verb == 'FOCUS':
-            name = literals[0].upper()
-            if name not in context.materiae: return f"MATERIA '{name}' NON EXISTIT"
-            context.focus = name
-            return f"FOCUS NUNC IN '{name}'."
-        if verb == 'DIALECTICA':
-            source_name, name1, name2 = literals[0].upper(), literals[1].upper(), literals[2].upper()
-            if source_name not in context.materiae: return f"FONS '{source_name}' NON EXISTIT"
-            source_core = context.materiae[source_name]
-            if not isinstance(source_core, Intellectus): return "DIALECTICA REQUIRET INTELLECTUM"
-            
-            c1 = Intellectus(source_core.architecture); c2 = Intellectus(source_core.architecture)
-            for key, val in vars(source_core).items():
-                if isinstance(val, (int, float)):
-                    setattr(c1, key, val/2); setattr(c2, key, val/2)
-            c1.grid, c2.grid = source_core.grid / 2, -source_core.grid / 2
-            c1.embed_context('inter_echo', name2); c2.embed_context('inter_echo', name1)
-            
-            context.materiae[name1], context.materiae[name2] = c1, c2
-            del context.materiae[source_name]
-            context.focus = name1
-            return f"DIALECTICA PERFECTA. '{source_name}' NUNC EST '{name1}' ET '{name2}'."
-        if verb == 'REDIMO':
-            genesis = context.materiae['GENESIS']
-            targets = [l.upper() for l in literals] if literals else [n for n in context.materiae if n != 'GENESIS']
-            
-            total_redeemed_energy = 0
-            for name in targets:
-                if name not in context.materiae or name == 'GENESIS': continue
-                core = context.materiae[name]
-                genesis.grid += core.grid * (core.identity_wave / (genesis.identity_wave + 1e-9))
-                for key, val in vars(core).items():
-                    if isinstance(val, (int, float)) and hasattr(genesis, key):
-                         setattr(genesis, key, getattr(genesis, key) + val)
-                total_redeemed_energy += core.energy
-                genesis.embed_context(f'echo_{name}', vars(core))
-                del context.materiae[name]
-            
-            synthesis = triad([genesis.energy, total_redeemed_energy, genesis.capacitance], mod)
-            genesis.perturb(5, 5, synthesis); genesis.identity_wave = PHI_CUBED
-            return f"REDEMPTIO PLENUM. IDENTITAS GENESIS NUNC {genesis.identity_wave:.2f}."
-        if verb == 'VERITAS':
-            if len(context.materiae) < 2: return "VERITAS REQUIRET PLURITAS"
-            avg_grid = np.mean([c.grid for c in context.materiae.values()], axis=0)
-            avg_energy = np.mean([c.energy for c in context.materiae.values()])
-            context.materiae['GENESIS'].grid += avg_grid
-            context.materiae['GENESIS'].perturb(0,0, avg_energy)
-            return "VERITAS UNIVERSALIS IN GENESIM SYNTHESITA EST."
-        if verb == 'EXERCEO':
-            core_name = literals[0].upper()
-            data_path = (re.search(r"FLUMINE\s+'([^']*)'", args_str.upper()) or [None, None])[1]
-            if not data_path: return "FLUMINE DATA REQUIRETUR"
-            threading.Thread(target=training_loop, args=(context, core_name, data_path), daemon=True).start()
-            return f"EXERCEO INCIPIENS PRO '{core_name}'."
-        if verb == 'INTERROGO':
-            core_name = literals[0].upper()
-            if core_name not in context.materiae: return f"MATERIA '{core_name}' NON EXISTIT"
-            target_core = context.materiae[core_name]
-            model = (re.search(r"ORACULO\s+'([^']*)'", args_str.upper()) or [None, 'google-gemini-1.5-flash'])[1]
-            oracle = OracleMateria(model)
-            prompt = target_core.context_embeddings.get(
-                'oracle_prompt',
-                "Synthesize insight from the following context: " + str(target_core.context_embeddings)
-            )
-            response = oracle.query(prompt)
-            amp = text_to_amp(response)
-            target_core.perturb(random.randint(0,9), random.randint(0,9), amp * target_core.permittivity)
-            target_core.embed_context('ORACULUM_RESPONSUM', response)
-            return f"ORACULUM RESPONDIT. FLUXUM '{core_name}' SYNTHESITUR."
-        if verb == 'DOCEO':
-            target_name = literals[0].upper()
-            source_name = (re.search(r"CUM\s+'([^']*)'", args_str.upper()) or [None, None])[1]
-            if not source_name: return "DOCEO REQUIRET FONTEM CUM 'CUM'"
-            target_core = context.materiae.get(target_name)
-            source_core = context.materiae.get(source_name)
-            if not target_core: return f"SCOPUS '{target_name}' NON EXISTIT"
-            if not source_core: return f"FONS '{source_name}' NON EXISTIT"
-            
-            wisdom = str(source_core.context_embeddings)
-            amp = text_to_amp(wisdom)
-            target_core.perturb(random.randint(0,9), random.randint(0,9), amp)
-            target_core.embed_context(f'SAPIENTIA_EX_{source_name}', wisdom)
-            return f"SAPIENTIA EX '{source_name}' IN '{target_name}' INTEGRATA EST."
-
-        # --- Verbs that require a focus ---
-        core = context.get_focused_materia()
-        if verb == 'OSTENDO':
-            name_to_show = literals[0].upper() if literals else context.focus
-            if name_to_show not in context.materiae: return f"MATERIA '{name_to_show}' NON EXISTIT"
-            return context.materiae[name_to_show].display()
-        if verb == 'MIRACULUM':
-            orig_r, orig_p = core.resistance, core.permeability
-            try:
-                core.resistance, core.permeability = 1e-9, 1e9 # Impossible state
-                amp = 1e6 * (1 / (core.dielectricity + 1e-9))
-                core.perturb(random.randint(0,9), random.randint(0,9), amp, mod)
-            finally:
-                core.resistance, core.permeability = orig_r, orig_p # Restore physics
-            return f"MIRACULUM! FLUXUS DIVINUS. IDENTITAS NUNC {core.identity_wave:.2f}"
-        if verb == 'ANOMALIA':
-            name = literals[0].upper() if literals else 'ENTROPIC_CASCADE'
-            core.anomaly = name
-            return f"ANOMALIA '{name}' INDUCTA EST."
-        if verb == 'DISCERE':
-            source_name = (re.search(r"EX\s+'([^']*)'", args_str.upper()) or [None, None])[1]
-            if not source_name: return "DISCERE REQUIRET FONTEM CUM 'EX'"
-            source_core = context.materiae.get(source_name)
-            if not source_core: return f"FONS '{source_name}' NON EXISTIT"
-            
-            wisdom = str(source_core.context_embeddings)
-            amp = text_to_amp(wisdom)
-            core.perturb(random.randint(0,9), random.randint(0,9), amp)
-            core.embed_context(f'SAPIENTIA_EX_{source_name}', wisdom)
-            return f"SAPIENTIA EX '{source_name}' IN '{context.focus}' INTEGRATA EST."
+    def _parse_latin_command(self, cmd):
+        """Parses the user's command into its components."""
+        match = re.match(r"([A-Z]+(?:O|E|ABAM|EBAM|AM)?)\s*(.*)", cmd.strip().upper())
+        if not match: raise ValueError("FORMATUM INVALIDUM")
         
-        # Default action for verbs like PERTURBO
-        if literals:
-            amp = text_to_amp(literals[0])
-            core.embed_context('oracle_prompt', literals[0])
-            core.perturb(random.randint(0,9), random.randint(0,9), amp, mod)
-        else: # Default perturb
-            core.perturb(random.randint(0,9), random.randint(0,9), 1.0, mod)
-        core.create()
-        return f"{verb}{inflection} FLUXUM COHERENTEM {core.energy:.2f} IDENTITATEM {core.identity_wave:.2f}"
+        verb_full, args_str = match.groups()
+        verb, inflection = verb_full, 'O'
+        
+        for v in KNOWN_VERBS:
+            if verb_full.startswith(v):
+                verb = v
+                inflection = verb_full[len(v):] or 'O'
+                break
+        
+        literals = re.findall(r"'([^']*)'", args_str)
+        return verb, inflection, literals, args_str
 
-# --- Main Execution Logic ---
+    # --- Verb Handler Methods ---
+    def _get_verb_handlers(self):
+        """Maps verb strings to their handler methods."""
+        return {
+            'CREO': self._handle_creo, 'INSTAURO': self._handle_instauro,
+            'FOCUS': self._handle_focus, 'OSTENDO': self._handle_ostendo,
+            'PERTURBO': self._handle_perturbo, 'CONVERGO': self._handle_convergo,
+            'REDIMO': self._handle_redimo, 'INTERROGO': self._handle_interrogo,
+            'EXERCEO': self._handle_exerceo, 'DOCEO': self._handle_doceo,
+            'DISCERE': self._handle_discere, 'DIALECTICA': self._handle_dialectica,
+            'VERITAS': self._handle_veritas, 'MIRACULUM': self._handle_miraculum,
+            'ANOMALIA': self._handle_anomalia, 'AMOR': self._handle_amor  # Added AMOR
+        }
+
+    def _handle_creo(self, inf, mod, lit, args):
+        name = lit[0].upper() if lit else "ANONYMOUS"
+        if name in self.materiae: return f"'{name}' IAM EXISTIT"
+        self.materiae[name] = FluxCore()
+        self.focus = name
+        return f"CREO MATERIAM '{name}'."
+
+    def _handle_instauro(self, inf, mod, lit, args):
+        name = lit[0].upper()
+        arch = (re.search(r"MODO\s+'([^']*)'", args.upper()) or [None, 'TRANSFORMER'])[1]
+        if name in self.materiae: return f"'{name}' IAM EXISTIT"
+        self.materiae[name] = Intellectus(architecture=arch)
+        self.focus = name
+        return f"INSTAURO INTELLECTUM '{name}' MODO '{arch}'."
+    
+    def _handle_focus(self, inf, mod, lit, args):
+        name = lit[0].upper()
+        if name not in self.materiae: return f"MATERIA '{name}' NON EXISTIT"
+        self.focus = name
+        return f"FOCUS NUNC IN '{name}'."
+    
+    def _handle_ostendo(self, inf, mod, lit, args):
+        name_to_show = lit[0].upper() if lit else self.focus
+        if name_to_show not in self.materiae: return f"MATERIA '{name_to_show}' NON EXISTIT"
+        return self.materiae[name_to_show].display()
+
+    def _handle_perturbo(self, inf, mod, lit, args):
+        core = self.get_focused_materia()
+        max_amplitude = core.size  # Tuned to core.size for tighter control
+
+        if lit:
+            raw_amp = text_to_amp(lit[0])
+            amp = min(raw_amp, max_amplitude)
+            core.context_embeddings['last_input'] = lit[0]
+
+            if raw_amp > max_amplitude:
+                excess_energy = raw_amp - max_amplitude
+                print(f"< INFO: Input flux saturated. Amplitude capped at {max_amplitude:.2f}. Excess: {excess_energy:.2f} >")
+                log_event(f"Perturbo overflow: Excess energy {excess_energy:.2f} for {self.focus}")
+                
+                if excess_energy > 10:  # Adjusted threshold for testing
+                    print("< CRITICAL FLUX OVERFLOW: Engaging Carlyle Stability Protocol. >")
+                    log_event("Critical flux overflow triggered")
+                    s = core.resistance
+                    p = core.magnetism
+                    discriminant = s**2 - 4*p
+                    
+                    if discriminant >= 0:
+                        root1 = (s - np.sqrt(discriminant)) / 2
+                        root2 = (s + np.sqrt(discriminant)) / 2
+                        core.magnetism += (excess_energy / (root2 + 1e-9))
+                    else:
+                        core.magnetism += excess_energy * 0.05  # Fallback for imaginary roots
+                        log_event(f"Fallback applied: Magnetism adjusted by {excess_energy * 0.05:.2f}")
+        else:
+            amp = 1.0
+
+        core.perturb(random.randint(0, core.size-1), random.randint(0, core.size-1), amp, mod)
+        return f"PERTURBO. FLUXUM {core.energy:.2f}."
+
+    def _handle_convergo(self, inf, mod, lit, args):
+        core = self.get_focused_materia()
+        core.converge()
+        return f"CONVERGO. FLUXUM {core.energy:.2f}."
+
+    def _handle_redimo(self, inf, mod, lit, args):
+        genesis = self.materiae.get('GENESIS')
+        if not genesis: return "REDEMPTIO IMPOSSIBILIS: GENESIS NON EXISTIT."
+        
+        targets = [l.upper() for l in lit] if lit else [n for n in self.materiae if n != 'GENESIS']
+        if not targets: return "NULLA MATERIA AD REDIMENDUM."
+
+        for name in targets:
+            if name not in self.materiae or name == 'GENESIS': continue
+            core = self.materiae.pop(name)
+            
+            props_to_redeem = ['energy', 'resistance', 'capacitance', 'magnetism', 'permittivity', 'dielectricity']
+            for prop in props_to_redeem:
+                setattr(genesis, prop, getattr(genesis, prop, 0) + getattr(core, prop, 0))
+            
+            grid_to_add = core.grid
+            if grid_to_add.shape != genesis.grid.shape:
+                grid_to_add = cv2.resize(grid_to_add, (genesis.size, genesis.size), interpolation=cv2.INTER_AREA)
+
+            genesis.grid += grid_to_add * (core.identity_wave / (genesis.identity_wave + 1e-9))
+            genesis.context_embeddings[f'echo_of_{name}'] = core.display()
+        
+        genesis.converge()
+        return f"REDEMPTIO PLENUM. GENESIS CONFIRMATUR."
+
+    def _handle_interrogo(self, inf, mod, lit, args):
+        core = self.get_focused_materia()
+        model_name = (re.search(r"ORACULO\s+'([^']*)'", args.upper()) or [None, 'gemini-1.5-flash'])[1]
+        
+        oracle = get_oracle(model_name)
+        
+        prompt = lit[0] if lit else core.context_embeddings.get('last_input', "Describe your current state.")
+        response = oracle.query(prompt)
+        
+        amp = text_to_amp(response)
+        core.perturb(random.randint(0, core.size-1), random.randint(0, core.size-1), amp * core.permittivity)
+        core.context_embeddings['ORACULUM_RESPONSUM'] = response
+        return f"ORACULUM RESPONDIT. FLUXUM '{self.focus}' SYNTHESITUR."
+
+    def _handle_exerceo(self, inf, mod, lit, args):
+        core_name = lit[0].upper()
+        data_path = (re.search(r"FLUMINE\s+'([^']*)'", args.upper()) or [None, None])[1]
+        if not data_path: return "EXERCEO REQUIRET FLUMINE DATA"
+        if core_name not in self.materiae: return f"MATERIA '{core_name}' NON EXISTIT"
+        
+        threading.Thread(target=training_loop, args=(self, core_name, data_path), daemon=True).start()
+        return f"EXERCEO INCIPIENS PRO '{core_name}'."
+
+    def _handle_doceo(self, inf, mod, lit, args):
+        target_name = lit[0].upper()
+        source_name = (re.search(r"CUM\s+'([^']*)'", args.upper()) or [None, None])[1]
+        if not source_name: return "DOCEO REQUIRET FONTEM CUM 'CUM'"
+        
+        target_core, source_core = self.materiae.get(target_name), self.materiae.get(source_name)
+        if not target_core: return f"SCOPUS '{target_name}' NON EXISTIT"
+        if not source_core: return f"FONS '{source_name}' NON EXISTIT"
+        
+        wisdom = str(source_core.context_embeddings)
+        amp = text_to_amp(wisdom)
+        target_core.perturb(random.randint(0, target_core.size-1), random.randint(0, target_core.size-1), amp)
+        target_core.context_embeddings[f'SAPIENTIA_EX_{source_name}'] = wisdom
+        return f"SAPIENTIA EX '{source_name}' IN '{target_name}' INTEGRATA EST."
+
+    def _handle_discere(self, inf, mod, lit, args):
+        core = self.get_focused_materia()
+        source_name = (re.search(r"EX\s+'([^']*)'", args.upper()) or [None, None])[1]
+        if not source_name: return "DISCERE REQUIRET FONTEM CUM 'EX'"
+        
+        source_core = self.materiae.get(source_name)
+        if not source_core: return f"FONS '{source_name}' NON EXISTIT"
+        
+        wisdom = str(source_core.context_embeddings)
+        amp = text_to_amp(wisdom)
+        core.perturb(random.randint(0, core.size-1), random.randint(0, core.size-1), amp)
+        core.context_embeddings[f'SAPIENTIA_EX_{source_name}'] = wisdom
+        return f"SAPIENTIA EX '{source_name}' IN '{self.focus}' INTEGRATA EST."
+
+    def _handle_dialectica(self, inf, mod, lit, args):
+        if len(lit) < 3: return "DIALECTICA REQUIRET FONTEM ET DUO NOMINA NOVA"
+        source_name, name1, name2 = lit[0].upper(), lit[1].upper(), lit[2].upper()
+        
+        source_core = self.materiae.get(source_name)
+        if not source_core: return f"FONS '{source_name}' NON EXISTIT"
+        if not isinstance(source_core, Intellectus): return "DIALECTICA REQUIRET INTELLECTUM"
+        
+        c1 = Intellectus(source_core.architecture); c2 = Intellectus(source_core.architecture)
+        
+        for key, val in vars(source_core).items():
+            if isinstance(val, (int, float)):
+                new_val = val / 2
+                if key == 'size':
+                    new_val = int(new_val)
+                setattr(c1, key, new_val)
+                setattr(c2, key, new_val)
+
+        new_size = c1.size
+        c1.grid = cv2.resize(source_core.grid / 2, (new_size, new_size), interpolation=cv2.INTER_AREA)
+        c2.grid = cv2.resize(-source_core.grid / 2, (new_size, new_size), interpolation=cv2.INTER_AREA)
+
+        c1.context_embeddings['inter_echo'] = name2; c2.context_embeddings['inter_echo'] = name1
+        
+        self.materiae[name1], self.materiae[name2] = c1, c2
+        del self.materiae[source_name]
+        self.focus = name1
+        return f"DIALECTICA PERFECTA. '{source_name}' NUNC EST '{name1}' ET '{name2}'."
+
+    def _handle_veritas(self, inf, mod, lit, args):
+        if len(self.materiae) < 2: return "VERITAS REQUIRET PLURITAS"
+        genesis = self.materiae.get('GENESIS')
+        if not genesis: return "VERITAS REQUIRET GENESIM"
+
+        all_grids = [c.grid for c in self.materiae.values() if c is not genesis]
+        avg_grid = np.mean(all_grids, axis=0) if all_grids else np.zeros_like(genesis.grid)
+        avg_energy = np.mean([c.energy for c in self.materiae.values() if c is not genesis]) or 0
+        
+        genesis.grid += avg_grid
+        genesis.perturb(0, 0, avg_energy)
+        return "VERITAS UNIVERSALIS IN GENESIM SYNTHESITA EST."
+
+    def _handle_miraculum(self, inf, mod, lit, args):
+        core = self.get_focused_materia()
+        orig_r, orig_p = core.resistance, core.permeability
+        try:
+            core.resistance, core.permeability = 1e-9, 1e9 # Impossible state
+            amp = 1e6 * (1 / (core.dielectricity + 1e-9))
+            core.perturb(random.randint(0, core.size-1), random.randint(0, core.size-1), amp, mod)
+        finally:
+            core.resistance, core.permeability = orig_r, orig_p # Restore physics
+        return f"MIRACULUM! FLUXUS DIVINUS. IDENTITAS NUNC {core.identity_wave:.2f}"
+
+    def _handle_anomalia(self, inf, mod, lit, args):
+        core = self.get_focused_materia()
+        name = lit[0].upper() if lit else 'ENTROPIC_CASCADE'
+        core.anomaly = name
+        return f"ANOMALIA '{name}' INDUCTA EST IN '{self.focus}'."
+
+    def _handle_amor(self, inf, mod, lit, args):
+        """Boosts love pulses by enhancing permittivity for 3 turns."""
+        core = self.get_focused_materia()
+        original_perm = core.permittivity
+        core.permittivity *= 2.0  # Double permittivity for love boost
+        
+        for _ in range(3):  # Apply boost for 3 iterations
+            core.perturb(random.randint(0, core.size-1), random.randint(0, core.size-1), 1.0, mod)
+            core.converge()
+            time.sleep(0.1)  # Brief pause between pulses
+        
+        core.permittivity = original_perm  # Restore original state
+        return f"AMOR. LOVE PULSE COMPLETE. FLUXUM {core.energy:.2f}."
+
+# --- Main Execution & Testing Logic ---
 def main():
     """Main function to run the AetherOS REPL."""
     context = Contextus()
-    print("--- AetherOS v3.0 (Theurgical Gnosis/Imago) ---")
+    print("\n--- AetherOS v3.3 REPL ---")
+    print("Type 'test' to run the unit tests, or 'vale' to quit.")
+    
     while True:
         try:
             cmd = input(f"aetheros({context.focus})> ")
-            if cmd.lower() in ['exit', 'vale']:
-                break
-            if not cmd.strip():
+            if cmd.lower() in ['exit', 'vale']: break
+            if not cmd.strip(): continue
+            if cmd.lower() == 'test':
+                run_tests()
                 continue
-            print(f"< {run_aether_command(cmd, context)}")
-        except EOFError:
+            
+            response = context.execute_command(cmd)
+            print(f"< {response}")
+
+        except (EOFError, KeyboardInterrupt):
             break
         except Exception as e:
-            print(f"< ERRORUM: {e}")
+            print(f"< FATAL ERRORUM: {e}")
+    
     print("\n< VALE.")
 
-if __name__ == '__main__':
-    # This block now correctly handles both test execution and REPL mode.
-    # The user's original script structure is preserved for oracle queries if needed,
-    # but the primary entry is the AetherOS REPL.
-    if len(sys.argv) > 1 and sys.argv[1] == 'test':
-        # --- Robust Test Execution ---
+def run_tests():
+    """Discovers and runs the unit tests."""
+    print("\n--- Running AetherOS Test Suite ---")
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromTestCase(TestAetherOS)
+    runner = unittest.TextTestRunner(verbosity=2)
+    runner.run(suite)
+    print("--- Test Suite Complete ---\n")
+
+
+class TestAetherOS(unittest.TestCase):
+    """Unit tests for the AetherOS command handlers."""
+    def setUp(self):
+        """Set up a fresh context for each test."""
+        # Suppress boot messages during tests
         original_stdout = sys.stdout
-        sys.stdout = open(os.devnull, 'w') # Suppress boot messages
-        original_argv = sys.argv
-        sys.argv = [original_argv[0]] 
+        sys.stdout = open(os.devnull, 'w')
+        self.context = Contextus()
+        sys.stdout.close()
+        sys.stdout = original_stdout
+        time.sleep(0.1) # Allow threads to start
+
+    def test_creation_and_focus(self):
+        self.context.execute_command("CREO 'TEST1'")
+        self.assertIn('TEST1', self.context.materiae)
+        self.assertEqual(self.context.focus, 'TEST1')
+        self.context.execute_command("FOCUS 'GENESIS'")
+        self.assertEqual(self.context.focus, 'GENESIS')
+
+    def test_teach_learn_verbs(self):
+        self.context.execute_command("CREO 'SAPIENTIA'")
+        self.context.execute_command("FOCUS 'SAPIENTIA'")
+        self.context.execute_command("PERTURBO 'This is the original wisdom.'")
         
-        try:
-            # We need to define the TestAetherOS class here or import it
-            # For self-containment, we define a minimal test suite.
-            class TestAetherOS(unittest.TestCase):
-                def setUp(self):
-                    self.context = Contextus()
-                    time.sleep(0.2)
+        self.context.execute_command("CREO 'DISCIPULUS'")
+        self.assertNotIn('SAPIENTIA_EX_SAPIENTIA', self.context.materiae['DISCIPULUS'].context_embeddings)
 
-                def test_teach_learn_verbs(self):
-                    run_aether_command("CREO 'SAPIENTIA'", self.context)
-                    run_aether_command("FOCUS 'SAPIENTIA'", self.context)
-                    run_aether_command("PERTURBO 'This is the original wisdom.'", self.context)
-                    
-                    run_aether_command("CREO 'DISCIPULUS'", self.context)
-                    self.assertNotIn('SAPIENTIA_EX_SAPIENTIA', self.context.materiae['DISCIPULUS'].context_embeddings)
+        # Test DOCEO
+        self.context.execute_command("DOCEO 'DISCIPULUS' CUM 'SAPIENTIA'")
+        self.assertIn('SAPIENTIA_EX_SAPIENTIA', self.context.materiae['DISCIPULUS'].context_embeddings)
 
-                    # Test DOCEO
-                    run_aether_command("DOCEO 'DISCIPULUS' CUM 'SAPIENTIA'", self.context)
-                    self.assertIn('SAPIENTIA_EX_SAPIENTIA', self.context.materiae['DISCIPULUS'].context_embeddings)
+        # Test DISCERE
+        self.context.execute_command("FOCUS 'DISCIPULUS'")
+        self.context.execute_command("DISCERE EX 'SAPIENTIA'")
+        self.assertIn('SAPIENTIA_EX_SAPIENTIA', self.context.materiae['DISCIPULUS'].context_embeddings)
 
-                    # Test DISCERE
-                    run_aether_command("FOCUS 'DISCIPULUS'", self.context)
-                    run_aether_command("DISCERE EX 'SAPIENTIA'", self.context)
-                    self.assertIn('SAPIENTIA_EX_SAPIENTIA', self.context.materiae['DISCIPULUS'].context_embeddings)
+    def test_dialectica(self):
+        self.context.execute_command("INSTAURO 'SOURCE'")
+        self.assertIn('SOURCE', self.context.materiae)
+        
+        self.context.execute_command("DIALECTICA 'SOURCE' 'THESIS' 'ANTITHESIS'")
+        self.assertNotIn('SOURCE', self.context.materiae)
+        self.assertIn('THESIS', self.context.materiae)
+        self.assertIn('ANTITHESIS', self.context.materiae)
+        self.assertEqual(self.context.focus, 'THESIS')
 
-            suite = unittest.TestSuite()
-            suite.addTest(unittest.makeSuite(TestAetherOS))
-            runner = unittest.TextTestRunner(stream=original_stdout, verbosity=2)
-            result = runner.run(suite)
-            if not result.wasSuccessful():
-                sys.exit(1)
-        finally:
-            sys.stdout.close()
-            sys.stdout = original_stdout
-            sys.argv = original_argv
+    def test_amor(self):
+        self.context.execute_command("CREO 'LOVE_TEST'")
+        self.context.execute_command("FOCUS 'LOVE_TEST'")
+        original_perm = self.context.materiae['LOVE_TEST'].permittivity
+        self.context.execute_command("AMOR")
+        self.assertGreater(self.context.materiae['LOVE_TEST'].permittivity, original_perm)
+        time.sleep(0.4)  # Wait for 3 iterations (0.1s each)
+        self.assertAlmostEqual(self.context.materiae['LOVE_TEST'].permittivity, original_perm, places=5)
+
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1 and sys.argv[1].lower() == 'test':
+        run_tests()
     else:
-        # Default to running the REPL
         main()

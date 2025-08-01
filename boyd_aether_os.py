@@ -1,8 +1,4 @@
-# boyd_aether_os.py
-#
-# Description:
-# An alternative AetherOS runtime that uses the Energy-Maneuverability
-# physics model defined in boyd_flux_core.py.
+#!/usr/bin/env python3
 
 import os
 import re
@@ -30,6 +26,7 @@ PHI = (1 + np.sqrt(5)) / 2
 
 # Helper functions (text_to_amp, etc.) remain the same...
 def text_to_amp(text):
+    """Convert text to amplitude by summing ord values and taking log1p."""
     return np.log1p(sum(ord(c) for c in text))
 
 # --- Main Application Context and Executor ---
@@ -41,9 +38,9 @@ class Contextus:
         self.lock = threading.RLock()
         self.verb_handlers = self._get_verb_handlers()
         self._boot()
-        # FIX: The DialecticRegulator does not exist in this version and has been removed.
 
     def _boot(self):
+        """Initialize the genesis materia."""
         print("< AetherOS v3.3 E-M (Boyd) Initializing... >")
         g = FluxCore()
         self.materiae['GENESIS'] = g
@@ -52,6 +49,7 @@ class Contextus:
         print("< Genesis Rhythm Complete. Focus on 'GENESIS'. >")
 
     def get_focused_materia(self):
+        """Get the currently focused materia."""
         with self.lock:
             if not self.focus or self.focus not in self.materiae:
                 self.focus = 'GENESIS' if 'GENESIS' in self.materiae else None
@@ -59,6 +57,7 @@ class Contextus:
             return self.materiae[self.focus]
 
     def execute_command(self, cmd):
+        """Execute a Latin-inspired command."""
         try:
             verb, inflection, literals, args_str = self._parse_latin_command(cmd)
             mod = inflection_map.get(inflection, {'mod': 1.0})['mod']
@@ -70,6 +69,7 @@ class Contextus:
             return f"ERRORUM INTERNUM: {e}"
 
     def _parse_latin_command(self, cmd):
+        """Parse the Latin command into verb, inflection, literals, and args."""
         match = re.match(r"([A-Z]+(?:O|E|ABAM|EBAM|AM)?)\s*(.*)", cmd.strip().upper())
         if not match: raise ValueError("FORMATUM INVALIDUM")
         verb_full, args_str = match.groups()
@@ -82,6 +82,7 @@ class Contextus:
         return verb, inflection, literals, args_str
 
     def _get_verb_handlers(self):
+        """Get the dictionary of verb handlers."""
         return {
             'CREO': self._handle_creo, 'INSTAURO': self._handle_instauro,
             'FOCUS': self._handle_focus, 'OSTENDO': self._handle_ostendo,
@@ -90,6 +91,7 @@ class Contextus:
         }
 
     def _handle_creo(self, inf, mod, lit, args):
+        """Handle CREO command: Create a new materia."""
         name = lit[0].upper() if lit else "ANONYMOUS"
         if name in self.materiae: return f"'{name}' IAM EXISTIT"
         self.materiae[name] = FluxCore()
@@ -97,25 +99,29 @@ class Contextus:
         return f"CREO MATERIAM '{name}'."
 
     def _handle_instauro(self, inf, mod, lit, args):
+        """Handle INSTAURO command: Create an intellectus."""
         name = lit[0].upper()
         arch = (re.search(r"MODO\s+'([^']*)'", args.upper()) or [None, 'TRANSFORMER'])[1]
         if name in self.materiae: return f"'{name}' IAM EXISTIT"
         self.materiae[name] = Intellectus(architecture=arch)
         self.focus = name
         return f"INSTAURO INTELLECTUM '{name}' MODO '{arch}'."
-    
+
     def _handle_focus(self, inf, mod, lit, args):
+        """Handle FOCUS command: Change focus to a materia."""
         name = lit[0].upper()
         if name not in self.materiae: return f"MATERIA '{name}' NON EXISTIT"
         self.focus = name
         return f"FOCUS NUNC IN '{name}'."
-    
+
     def _handle_ostendo(self, inf, mod, lit, args):
+        """Handle OSTENDO command: Display a materia."""
         name_to_show = lit[0].upper() if lit else self.focus
         if name_to_show not in self.materiae: return f"MATERIA '{name_to_show}' NON EXISTIT"
         return self.materiae[name_to_show].display()
 
     def _handle_perturbo(self, inf, mod, lit, args):
+        """Handle PERTURBO command: Perturb the materia."""
         core = self.get_focused_materia()
         amp = text_to_amp(lit[0]) if lit else 10.0
         thrust_change = amp * 0.1 * mod
@@ -124,16 +130,21 @@ class Contextus:
         return f"MANEUVER COMPLETE. Es={core.specific_energy:.2f}"
 
     def _handle_convergo(self, inf, mod, lit, args):
+        """Handle CONVERGO command: Stabilize the materia."""
         core = self.get_focused_materia()
         core.stabilize()
         return f"STABILIZING. Es={core.specific_energy:.2f}"
 
     def _handle_interrogo(self, inf, mod, lit, args):
+        """Handle INTERROGO command: Query the oracle."""
         core = self.get_focused_materia()
         model_name = (re.search(r"ORACULO\s+'([^']*)'", args.upper()) or [None, 'gemini-1.5-flash'])[1]
         oracle = get_oracle(model_name)
         prompt = lit[0] if lit else "Describe your current energy state."
         response = oracle.query(prompt)
+        
+        if "ORACULUM ERRORUM" in response:
+            return response
         
         amp = text_to_amp(response)
         core.maneuver(amp * 0.2, amp * 0.02)
@@ -153,8 +164,13 @@ def main():
             response = context.execute_command(cmd)
             print(f"< {response}")
         except (EOFError, KeyboardInterrupt):
+            print("\n< Cleaning up threads... >")
+            # Add cleanup for any threads if needed
             break
     print("\n< VALE.")
 
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == 'test':
+        unittest.main()
+    else:
+        main()

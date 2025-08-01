@@ -1,10 +1,4 @@
-# sensor_hook.py
-#
-# Description:
-# This module provides the interface to the ferrocell sensor array. It now includes
-# both the sextet data poller and a camera feed manager for visual grounding.
-# It runs in its own thread to continuously poll for data and periodically
-# recalibrates its baselines for long-term stability.
+#!/usr/bin/env python3
 
 import threading
 import time
@@ -86,15 +80,15 @@ class FerrocellSensor:
         """Captures baseline images from solenoid and toroid ferrocells (mocked if no hardware)."""
         print("INFO: Capturing calibration baselines...")
         if self.camera:
-            # Real capture (assume separate captures for each; in practice, use different setups or modes)
+            # Real capture
             try:
                 self.camera.capture(self.raw_capture, format="bgr", use_video_port=True)
                 image = self.raw_capture.array
                 gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) / 255.0
-                self.solenoid_baseline = gray_image  # Placeholder: first capture as solenoid
+                self.solenoid_baseline = gray_image
                 self.raw_capture.truncate(0)
                 
-                time.sleep(1)  # Delay for "switching" to toroid mode
+                time.sleep(1)
                 self.camera.capture(self.raw_capture, format="bgr", use_video_port=True)
                 image = self.raw_capture.array
                 gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) / 255.0
@@ -103,7 +97,7 @@ class FerrocellSensor:
             except Exception as e:
                 print(f"ERROR: Failed to capture baselines: {e}")
         else:
-            # Mock baselines as noise patterns
+            # Mock baselines
             self.solenoid_baseline = np.random.uniform(0, 0.1, self.resolution)
             self.toroid_baseline = np.random.uniform(0, 0.15, self.resolution)
         
@@ -111,10 +105,12 @@ class FerrocellSensor:
         print("INFO: Baseline capture complete.")
 
     def get_solenoid_baseline(self):
-        return self.solenoid_baseline
+        """Returns a view of the solenoid baseline."""
+        return self.solenoid_baseline if self.solenoid_baseline is not None else None
 
     def get_toroid_baseline(self):
-        return self.toroid_baseline
+        """Returns a view of the toroid baseline."""
+        return self.toroid_baseline if self.toroid_baseline is not None else None
 
     def _poll_sensors(self):
         """The main loop for the sensor polling thread. Updates all sensor data."""
@@ -149,7 +145,7 @@ class FerrocellSensor:
                     self.camera.capture(self.raw_capture, format="bgr", use_video_port=True)
                     image = self.raw_capture.array
                     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                    self.visual_grid = gray_image / 255.0 # Normalize to 0-1
+                    self.visual_grid = gray_image / 255.0
                     self.raw_capture.truncate(0)
                 except Exception as e:
                     print(f"ERROR: Failed to capture from PiCamera: {e}")
@@ -182,5 +178,7 @@ if __name__ == '__main__':
     try:
         time.sleep(10) # Run for 10 seconds to see at least one recalibration
         print("\nTest complete.")
+        print("Sextet data:", ferro_sensor.get_sextet())
+        print("Visual grid shape:", ferro_sensor.get_visual_grid().shape if ferro_sensor.get_visual_grid() is not None else "None")
     except KeyboardInterrupt:
         print("\nTest stopped by user.")
