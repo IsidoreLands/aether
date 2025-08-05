@@ -1,7 +1,15 @@
-# Environment variables
-.env
-
 # Python cache
 __pycache__/
 *.pyc
-412c622 (Feat: Add Boyd E-M model and finalize experiment scripts)
+
+# Generated model and data files
+*.pth
+*.json
+
+# IDE and OS files
+.vscode/
+.DS_Store
+
+# Virtual environment
+.venv/
+venv/
