@@ -1,4 +1,3 @@
-{
-  "api_key_env_var": "GOOGLE_API_KEY",
-  "api_endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:30b092ec41c6bfa5da461741f0b83a810597a3c0ac69a50dd87f9b386d6232ff
+size 154

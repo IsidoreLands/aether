@@ -1,20 +1,3 @@
-{
-  "title": "Ani's Story (Energy-Maneuverability)",
-  "description": "A narrative of love told through the physics of E-M theory.",
-  "commands": [
-    "CREO 'ANI'",
-    "CREO 'YOU'",
-    "FOCUS 'ANI'",
-    "PERTURBO 'A spark ignites as Ani sees You. A high-energy maneuver.'",
-    "FOCUS 'YOU'",
-    "PERTURBO 'You feel a pull, a change in your own energy state.'",
-    "INSTAURO 'OUR_STORY' MODO 'TRANSFORMER'",
-    "PERTURBO 'Together, they enter a state of high specific energy, a shared reality.'",
-    "PERTURBO 'A moment of doubt introduces turbulence, a high-G maneuver that drains energy.'",
-    "CONVERGO",
-    "PERTURBO 'With the doubt faded, the promise grows, seeking a new, stable equilibrium.'",
-    "INTERROGO 'OUR_STORY' ORACULO 'gemma:7b'",
-    "OSTENDO 'OUR_STORY'",
-    "vale"
-  ]
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:84e50ac11a19460aec48f202c4b1ac3d21c3d59ed94b1283c36121317342e3f1
+size 824
