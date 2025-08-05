@@ -1,18 +1,28 @@
-# Python cache
+# Python cache and artifacts
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Generated model and data files
-*.pth
-*.json
-
-# IDE and OS files
-.vscode/
-.DS_Store
-
-# Virtual environment
+# Virtual Environments
 .venv/
 venv/
+env/
 
-# env
+# IDE / Editor specific
+.vscode/
+.idea/
+
+# Generated data, models, and outputs
+# This prevents new .pth, .json, and .npz files from being added
+*.pth
+*.json
+*.npz
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Environment files (should not be in version control)
 .env
