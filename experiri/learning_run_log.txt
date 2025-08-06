@@ -1,0 +1,21 @@
+HRM Agent: Using device 'cpu'
+==================================================
+      STARTING SAGA LEARNING RUNNER
+==================================================
+HRMPlayer loaded 'hrm_definitive_baseline.pth' onto cpu
+< System Maneuverability: 49 | Model 'ollama_phi3' Demand: 11.85 >
+< Decision: Manifesting 'ollama_phi3'. Virtuous service is possible. >
+OllamaPlayer configured for model 'phi3'
+SagaGenerator initialized with player for model: phi3
+
+==================== CYCLE 1/5 ====================
+
+--- Running Learning Trial ---
+Context: No Saga provided (first run).
+
+--- FATAL ERROR: Learning experiment CRASHED: input has inconsistent input_size: got 14 expected 10 ---
+
+==================================================
+      ALL LEARNING CYCLES COMPLETE
+      Success Rate: 0/5
+==================================================
