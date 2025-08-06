@@ -88,7 +88,6 @@ class OllamaPlayer:
             "model": self.model_name,
             "prompt": prompt,
             "stream": False,
-            "format": "json",
             "options": {
                 "temperature": 0.2  # Low temperature for focused, deterministic output
             },
@@ -99,8 +98,7 @@ class OllamaPlayer:
             ) as response:
                 response.raise_for_status()
                 response_json = await response.json()
-                inner_json_str = response_json.get("response", "{}")
-                return json.loads(inner_json_str)
+                return response_json.get("response", "")  # Return the raw text response
         except Exception as e:
             return {"error": f"Ollama API Error: {e}"}
 
