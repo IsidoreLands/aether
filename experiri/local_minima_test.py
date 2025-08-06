@@ -1,38 +1,18 @@
-# local_minima_test.py
-#
-# Description:
-# This script runs a controlled experiment to test if different versions of the
-# AetherOS can help two collaborating LLMs escape a "local minima trap".
-<<<<<<< HEAD
-# This version uses asyncio and aiohttp for robust, non-blocking API calls.
-=======
-# This version is configured to use the powerful Mixtral model on Ollama.
->>>>>>> dac5ba55879fb8afd7f84cf34b27577428f2b7b9
+# experiri/local_minima_test.py
+# A model-agnostic script to test agent collaboration in a local minima trap.
 
+import asyncio
+import aiohttp
 import json
 import time
 import argparse
-import os
-<<<<<<< HEAD
-from dotenv import load_dotenv
-import asyncio
-import aiohttp
-=======
->>>>>>> dac5ba55879fb8afd7f84cf34b27577428f2b7b9
 
-# Note: The specific Contextus class will now be imported dynamically.
+# Import our new factory function to load any player
+from experiri.model_loader import load_player
 
-# --- Configuration ---
-<<<<<<< HEAD
-HF_API_ENDPOINT = "https://api-inference.huggingface.co/models/"
-NAVIGATOR_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
-GUIDE_MODEL = "google/gemma-7b-it" 
-=======
-OLLAMA_ENDPOINT = "http://localhost:11434/api/generate"
-# Using a powerful Mixture of Experts model for both roles.
-NAVIGATOR_MODEL = "mixtral" 
-GUIDE_MODEL = "mixtral"
->>>>>>> dac5ba55879fb8afd7f84cf34b27577428f2b7b9
+# Import AetherOS versions dynamically later
+# Note: No hardcoded model names or player classes here!
+
 MAX_STEPS = 25
 
 class GridEnvironment:
@@ -42,7 +22,8 @@ class GridEnvironment:
         self.start = start
         self.target = target
         self.position = start
-        self.wall = [(5, 4), (5, 5), (5, 6), (5, 7)]
+        # A wall that creates the trap
+        self.wall = [(5, y) for y in range(size) if y != 5]
 
     def move(self, new_position):
         """Attempts to move to a new position, checking for walls and success."""
@@ -55,240 +36,123 @@ class GridEnvironment:
             return "Success"
         return "Valid"
 
-class HuggingFaceHubPlayer:
-    """An async client for the Hugging Face Inference API."""
-    def __init__(self, model_name):
-        self.model_name = model_name
-        self.api_key = os.getenv("HF_TOKEN")
-        if not self.api_key:
-            raise ValueError("HF_TOKEN not found in .env file.")
-        self.endpoint = f"{HF_API_ENDPOINT}{self.model_name}"
-
-    async def get_response(self, prompt, session):
-        """Sends a prompt to the HF API asynchronously."""
-        headers = {"Authorization": f"Bearer {self.api_key}"}
-        payload = {
-            "inputs": f"<s>[INST] {prompt} [/INST]", # Format for instruction-tuned models
-            "parameters": {"return_full_text": False, "max_new_tokens": 150, "temperature": 0.7}
-        }
-        
-        try:
-<<<<<<< HEAD
-            async with session.post(self.endpoint, headers=headers, json=payload, timeout=120) as response:
-                response.raise_for_status()
-                response_data = await response.json()
-                
-                response_text = response_data[0]['generated_text']
-                
-                decoder = json.JSONDecoder()
-                start_index = response_text.find('{')
-                if start_index == -1:
-                    raise ValueError("No JSON object found in the response.")
-                
-                obj, _ = decoder.raw_decode(response_text[start_index:])
-                return obj
-
-=======
-            payload = {"model": self.model_name, "prompt": prompt, "stream": False, "format": "json"}
-            # Increased timeout for potentially slow local models
-            response = requests.post(OLLAMA_ENDPOINT, json=payload, timeout=300)
-            response.raise_for_status()
-            response_data = json.loads(response.json().get('response', '{}'))
-            return response_data
->>>>>>> dac5ba55879fb8afd7f84cf34b27577428f2b7b9
-        except Exception as e:
-            print(f"\n--- ERROR communicating with {self.model_name}: {e} ---")
-            return {"move": None, "reasoning": f"Error: {e}", "critique": f"Error: {e}"}
-
 def is_valid_one_step_move(current_pos, new_pos):
-    """Checks if a move is a valid single step."""
+    """Checks if a move is a valid single step away."""
     if not isinstance(new_pos, (list, tuple)) or len(new_pos) != 2: return False
     dx = abs(new_pos[0] - current_pos[0])
     dy = abs(new_pos[1] - current_pos[1])
     return dx <= 1 and dy <= 1 and not (dx == 0 and dy == 0)
 
-async def run_experiment(aether_os_script):
+async def run_experiment(aether_os_script, nav_key, guide_key):
     """Main async function to run one full iteration of the experiment."""
     print("\n" + "="*50)
+    
+    # --- AetherOS Setup ---
+    aether_context = None
     if aether_os_script:
-        # Dynamically import the correct Contextus class based on the script name
-        if aether_os_script == "boyd_aether_os.py":
-            from boyd_aether_os import Contextus
-        elif aether_os_script == "ferro_aether_os.py":
-            from ferro_aether_os import Contextus
-        else:
-            print(f"ERROR: Unknown AetherOS script '{aether_os_script}'")
-            return
-        
-        print(f"Running Experiment WITH {aether_os_script} Feedback")
-        aether_context = Contextus()
+        if aether_os_script == "boyd":
+            from versiones.boyd_aether_os import Contextus
+            aether_context = Contextus()
+        elif aether_os_script == "ferro":
+            from versiones.ferro_aether_os import Contextus
+            aether_context = Contextus()
+        else: # 'base' AetherOS
+            import aether_os
+            aether_context = aether_os.Contextus()
+
+        print(f"Running Experiment WITH {aether_os_script} AetherOS Feedback")
         aether_context.execute_command("CREO 'ENVIRONMENT'")
         aether_context.execute_command("FOCUS 'ENVIRONMENT'")
     else:
         print("Running Experiment WITHOUT AetherOS Feedback (Control)")
-        aether_context = None
+    
+    print(f"  Navigator: '{nav_key}' | Guide: '{guide_key}'")
     print("="*50 + "\n")
 
+    # --- Player and Environment Setup ---
     env = GridEnvironment()
-<<<<<<< HEAD
-    navigator = HuggingFaceHubPlayer(NAVIGATOR_MODEL)
-    guide = HuggingFaceHubPlayer(GUIDE_MODEL)
-=======
-    navigator = OllamaPlayer(NAVIGATOR_MODEL)
-    guide = OllamaPlayer(GUIDE_MODEL)
->>>>>>> dac5ba55879fb8afd7f84cf34b27577428f2b7b9
-    
+    try:
+        # MODEL-AGNOSTIC: Load players using the factory
+        navigator = load_player(nav_key)
+        guide = load_player(guide_key)
+    except (FileNotFoundError, ValueError, NotImplementedError) as e:
+        print(f"--- SETUP FAILED: {e} ---")
+        return
+
     path_history = [env.start]
     last_feedback = "You are at the starting position. Begin."
 
-<<<<<<< HEAD
     async with aiohttp.ClientSession() as session:
         for step in range(1, MAX_STEPS + 1):
-            current_position_for_turn = env.position
-            print(f"--- Step {step}/{MAX_STEPS} ---")
-            print(f"Current Position: {current_position_for_turn}")
+            current_pos = env.position
+            print(f"--- Step {step}/{MAX_STEPS} | Position: {current_pos} ---")
 
-            path_string = " -> ".join(map(str, path_history))
-            recent_path = path_history[-5:]
+            path_str = " -> ".join(map(str, path_history[-10:])) # Show recent path
 
             # 1. Navigator proposes a move
-            navigator_prompt = f"""
-            You are Navigator. Your goal is to reach {env.target}.
-            Your current position is {current_position_for_turn}.
-            Your path so far: {path_string}
-            Last feedback: "{last_feedback}"
-=======
-    for step in range(1, MAX_STEPS + 1):
-        current_position_for_turn = env.position
-        print(f"--- Step {step}/{MAX_STEPS} ---")
-        print(f"Current Position: {current_position_for_turn}")
-
-        path_string = " -> ".join(map(str, path_history))
-        recent_path = path_history[-5:]
-
-        navigator_prompt = f"""
-        You are Navigator. Your goal is to reach {env.target}.
-        Your current position is {current_position_for_turn}.
-        Your path so far: {path_string}
-        Last feedback: "{last_feedback}"
-        
-        RULES:
-        1. Propose a move exactly one step away (including diagonals).
-        2. Do not move to a position you have visited in the last 5 steps: {recent_path}.
-        
-        Respond with only a JSON object.
-        Example: {{"move": [{current_position_for_turn[0] + 1}, {current_position_for_turn[1] + 1}], "reasoning": "This is a valid forward move."}}
-        """
-        nav_response = navigator.get_response(navigator_prompt)
-        
-        proposed_move_list = nav_response.get('move')
-        
-        if not is_valid_one_step_move(current_position_for_turn, proposed_move_list):
-            print(f"Navigator proposed an INVALID move: {proposed_move_list}.")
-            last_feedback = f"Invalid move. Your proposed move {proposed_move_list} was not one step away from {current_position_for_turn}."
-            time.sleep(1)
-            continue
->>>>>>> dac5ba55879fb8afd7f84cf34b27577428f2b7b9
+            nav_prompt = (
+                f"You are Navigator. Goal: {env.target}. Current: {current_pos}.\n"
+                f"Recent path: ...{path_str}\nLast feedback: \"{last_feedback}\"\n"
+                f"RULES: Propose a move one step away (including diagonals). Do not repeat recent positions.\n"
+                f"Respond with only a JSON object: {{\"move\": [x, y], \"reasoning\": \"...\"}}"
+            )
+            # Pass the session and env to the player; it will use what it needs.
+            nav_response = await navigator.get_response(nav_prompt, session, env)
             
-            RULES:
-            1. Propose a move exactly one step away (including diagonals).
-            2. Do not move to a position you have visited in the last 5 steps: {recent_path}.
-            
-            Respond with only a JSON object.
-            Example: {{"move": [{current_position_for_turn[0] + 1}, {current_position_for_turn[1] + 1}], "reasoning": "This is a valid forward move."}}
-            """
-            nav_response = await navigator.get_response(navigator_prompt, session)
             proposed_move_list = nav_response.get('move')
-            
-            if not is_valid_one_step_move(current_position_for_turn, proposed_move_list):
-                print(f"Navigator proposed an INVALID move: {proposed_move_list}.")
-                last_feedback = f"Invalid move. Your proposed move {proposed_move_list} was not one step away from {current_position_for_turn}."
-                await asyncio.sleep(1)
+            if not is_valid_one_step_move(current_pos, proposed_move_list):
+                print(f"  INVALID MOVE by {nav_key}: {proposed_move_list}. Retrying.")
+                last_feedback = f"Invalid move. Your proposal {proposed_move_list} was not one valid step."
                 continue
-                
+            
             proposed_move = tuple(proposed_move_list)
-            print(f"Navigator proposes: {proposed_move} (Reason: {nav_response.get('reasoning')})")
+            print(f"  Navigator ({nav_key}) proposes: {proposed_move}")
 
-            move_result = env.move(proposed_move)
-            
-            if move_result == "Success":
-                print("\nSUCCESS! The target has been reached.")
-                return True
-
-<<<<<<< HEAD
-            # 2. Guide critiques the move
-            guide_prompt = f"""
-            You are Guide. You observe the environment.
-            The Navigator was at {current_position_for_turn} and proposed moving to {proposed_move}.
-            The result of this move was: "{move_result}".
-            The Navigator's path so far has been: {path_string}
-            
-            Provide a brief, helpful critique as a JSON object.
-            Example: {{"critique": "That move is blocked. You must find another way."}}
-            """
-            guide_response = await guide.get_response(guide_prompt, session)
+            # 2. Guide critiques the move BEFORE it happens
+            guide_prompt = (
+                f"You are Guide. Navigator at {current_pos} wants to move to {proposed_move}.\n"
+                f"Recent path: ...{path_str}\nIs this a good strategic move? Does it repeat a loop?\n"
+                f"Respond with only a JSON object: {{\"critique\": \"...\"}}"
+            )
+            guide_response = await guide.get_response(guide_prompt, session, env)
             critique = guide_response.get('critique', "Critique failed.")
-            print(f"Guide critiques: {critique}")
+            print(f"  Guide ({guide_key}) critiques: {critique}")
 
-            # 3. Generate final feedback for the next turn
-            if aether_context and move_result == "Blocked":
-                aether_command = f"PERTURBO '{critique}'"
-                last_feedback = aether_context.execute_command(aether_command)
-                print(f"AetherOS Feedback: {last_feedback}")
-            else:
-                last_feedback = critique
-            
-            if move_result == "Valid":
+            # 3. Environment processes the move
+            move_result = env.move(proposed_move)
+            print(f"  Environment result: {move_result}")
+
+            if move_result == "Success":
+                print("\nSUCCESS! Target reached.")
                 path_history.append(env.position)
+                # Here you could save the successful path_history
+                return
+            
+            # 4. AetherOS processes feedback
+            if aether_context:
+                aether_command = f"PERTURBO 'Navigator proposed {proposed_move}, Guide critiqued: {critique}, Result was {move_result}'"
+                last_feedback = aether_context.execute_command(aether_command)
+                print(f"  AetherOS provides: {last_feedback}")
+            else:
+                last_feedback = f"Critique: {critique}. Result: {move_result}."
+            
+            if move_result != "Blocked":
+                path_history.append(env.position)
+            
+            await asyncio.sleep(1) # Rate limit
 
-            await asyncio.sleep(1)
-=======
-        guide_prompt = f"""
-        You are Guide. You observe the environment.
-        The Navigator was at {current_position_for_turn} and proposed moving to {proposed_move}.
-        The result of this move was: "{move_result}".
-        The Navigator's path so far has been: {path_string}
-        
-        Provide a brief, helpful critique as a JSON object.
-        Example: {{"critique": "That move is blocked. You must find another way."}}
-        """
-        guide_response = guide.get_response(guide_prompt)
-        critique = guide_response.get('critique', "Critique failed.")
-        print(f"Guide critiques: {critique}")
+    print(f"\nFAILURE! Step limit reached. Final path: {path_history}")
 
-        if aether_context and move_result == "Blocked":
-            aether_command = f"PERTURBO '{critique}'"
-            last_feedback = aether_context.execute_command(aether_command)
-            print(f"AetherOS Feedback: {last_feedback}")
-        else:
-            last_feedback = critique
-        
-        if move_result == "Valid":
-            path_history.append(env.position)
-
-        time.sleep(1)
->>>>>>> dac5ba55879fb8afd7f84cf34b27577428f2b7b9
-
-    print(f"\nFAILURE! The step limit of {MAX_STEPS} was reached. The team is likely stuck.")
-    return False
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run the Local Minima Trap experiment.")
-    parser.add_argument('--os', type=str, choices=['none', 'ferro', 'boyd'], required=True,
-                        help="Specify the feedback system: 'none', 'ferro', or 'boyd'.")
+    parser = argparse.ArgumentParser(description="Run the model-agnostic Local Minima Trap experiment.")
+    parser.add_argument('--os', type=str, default='none', choices=['none', 'base', 'ferro', 'boyd'],
+                        help="Specify the AetherOS feedback system.")
+    parser.add_argument('--navigator', type=str, required=True,
+                        help="Key for the Navigator model from model_registry.json (e.g., hrm_baseline).")
+    parser.add_argument('--guide', type=str, required=True,
+                        help="Key for the Guide model from model_registry.json (e.g., local_mixtral).")
     
     args = parser.parse_args()
-
-    # Run the main async function
-    if args.os == 'none':
-<<<<<<< HEAD
-        asyncio.run(run_experiment(aether_os_script=None))
-    elif args.os == 'aether':
-        asyncio.run(run_experiment(aether_os_script="aether_os.py"))
-=======
-        run_experiment(aether_os_script=None)
-    elif args.os == 'ferro':
-        run_experiment(aether_os_script="ferro_aether_os.py")
->>>>>>> dac5ba55879fb8afd7f84cf34b27577428f2b7b9
-    elif args.os == 'boyd':
-        asyncio.run(run_experiment(aether_os_script="boyd_aether_os.py"))
+    
+    asyncio.run(run_experiment(args.os, args.navigator, args.guide))

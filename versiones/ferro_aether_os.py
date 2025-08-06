@@ -17,7 +17,7 @@ import cv2
 
 # Import components from the other modules
 from flux_core import FluxCore, Intellectus
-from oracle import get_oracle
+from versiones.ferro_oracle import get_oracle
 
 # --- AetherOS Grammar and Constants ---
 KNOWN_VERBS = ['PERTURBO', 'CONVERGO', 'CREO', 'OSTENDO', 'FOCUS', 'ANOMALIA', 'VERITAS', 

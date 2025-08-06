@@ -7,7 +7,7 @@ import unittest
 import torch
 
 # Import the model and device configuration from our agent script
-from hrm_agent import HRM, device
+from animus.auctores.hrm_agent import HRM, device
 
 class TestHRM(unittest.TestCase):
     """

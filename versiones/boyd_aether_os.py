@@ -7,170 +7,177 @@ import threading
 import time
 import random
 import numpy as np
-import unittest
+import asyncio
+import aiohttp
 
-# Import components from the E-M modules
-from boyd_flux_core import FluxCore, Intellectus
-from oracle import get_oracle
+# Import Boyd-specific physics and the new universal model loader
+from versiones.boyd_flux_core import FluxCore, Intellectus
+from experiri.model_loader import load_player
 
-# --- AetherOS Grammar and Constants (mostly unchanged) ---
-KNOWN_VERBS = ['PERTURBO', 'CONVERGO', 'CREO', 'OSTENDO', 'FOCUS', 'ANOMALIA', 'VERITAS', 
-               'MIRACULUM', 'REDIMO', 'INTERROGO', 'INSTAURO', 'EXERCEO', 'DIALECTICA', 
-               'DOCEO', 'DISCERE']
-KNOWN_INFLECTIONS = ['ABAM', 'EBAM', 'AM', 'O', 'E']
-inflection_map = {
-    'O': {'mod': 1.0}, 'E': {'mod': -1.0}, 'ABAM': {'mod': 1.5},
-    'EBAM': {'mod': -0.5}, 'AM': {'mod': random.uniform(0.5, 1.5)}
+# --- OODA Loop & E-M Grammar ---
+KNOWN_VERBS = ['ENGAGE', 'DISENGAGE', 'CREATE', 'STATUS', 'FOCUS', 'JAM', 'INTERROGATE']
+KNOWN_MODIFIERS = ['AGGRESSIVE', 'DEFENSIVE', 'NEUTRAL', 'IMMEDIATE']
+modifier_map = {
+    'NEUTRAL': {'thrust_mod': 1.0, 'load_mod': 1.0},
+    'AGGRESSIVE': {'thrust_mod': 1.5, 'load_mod': 1.2},
+    'DEFENSIVE': {'thrust_mod': 0.8, 'load_mod': 1.8},
+    'IMMEDIATE': {'thrust_mod': 2.0, 'load_mod': 0.5} # High thrust, low load for quick reaction
 }
 PHI = (1 + np.sqrt(5)) / 2
 
-# Helper functions (text_to_amp, etc.) remain the same...
 def text_to_amp(text):
     """Convert text to amplitude by summing ord values and taking log1p."""
     return np.log1p(sum(ord(c) for c in text))
 
 # --- Main Application Context and Executor ---
 class Contextus:
-    """The container for the entire AetherOS cosmos and command execution."""
+    """The cockpit and battle management system for an E-M agent."""
     def __init__(self):
-        self.materiae = {}
-        self.focus = None
+        self.squadron = {} # Renamed from 'materiae'
+        self.target = None # Renamed from 'focus'
         self.lock = threading.RLock()
         self.verb_handlers = self._get_verb_handlers()
         self._boot()
+        # No autonomous regulator for the Boyd version; all actions are deliberate.
 
     def _boot(self):
-        """Initialize the genesis materia."""
-        print("< AetherOS v3.3 E-M (Boyd) Initializing... >")
-        g = FluxCore()
-        self.materiae['GENESIS'] = g
-        self.focus = 'GENESIS'
-        g.maneuver(10, 0.1)
-        print("< Genesis Rhythm Complete. Focus on 'GENESIS'. >")
+        """Initialize the lead agent."""
+        print("< E-M Combat System v4.1 (OODA) Initializing... >")
+        lead_agent = FluxCore()
+        self.squadron['LEAD'] = lead_agent
+        self.target = 'LEAD'
+        lead_agent.maneuver(10, 0.1)
+        print("< Lead agent online. Target lock on 'LEAD'. >")
 
-    def get_focused_materia(self):
-        """Get the currently focused materia."""
+    def get_targeted_agent(self):
+        """Get the currently targeted agent."""
         with self.lock:
-            if not self.focus or self.focus not in self.materiae:
-                self.focus = 'GENESIS' if 'GENESIS' in self.materiae else None
-            if not self.focus: raise ValueError("NULLA MATERIA IN FOCO EST")
-            return self.materiae[self.focus]
+            if not self.target or self.target not in self.squadron:
+                self.target = 'LEAD' if 'LEAD' in self.squadron else None
+            if not self.target: raise ValueError("NO AGENT TARGETED")
+            return self.squadron[self.target]
 
-    def execute_command(self, cmd):
-        """Execute a Latin-inspired command."""
+    async def execute_command(self, cmd):
+        """Execute a combat directive."""
         try:
-            verb, inflection, literals, args_str = self._parse_latin_command(cmd)
-            mod = inflection_map.get(inflection, {'mod': 1.0})['mod']
+            verb, modifier, literals, args_str = self._parse_command(cmd)
+            mods = modifier_map.get(modifier, {'thrust_mod': 1.0, 'load_mod': 1.0})
+            
             handler = self.verb_handlers.get(verb)
             if handler:
-                return handler(inflection, mod, literals, args_str)
-            return f"VERBUM IGNORATUM '{verb}'"
+                if asyncio.iscoroutinefunction(handler):
+                    return await handler(modifier, mods, literals, args_str)
+                else:
+                    return handler(modifier, mods, literals, args_str)
+            return f"DIRECTIVE UNKNOWN: '{verb}'"
         except Exception as e:
-            return f"ERRORUM INTERNUM: {e}"
+            return f"SYSTEM FAULT: {e}"
 
-    def _parse_latin_command(self, cmd):
-        """Parse the Latin command into verb, inflection, literals, and args."""
-        match = re.match(r"([A-Z]+(?:O|E|ABAM|EBAM|AM)?)\s*(.*)", cmd.strip().upper())
-        if not match: raise ValueError("FORMATUM INVALIDUM")
-        verb_full, args_str = match.groups()
-        verb, inflection = verb_full, 'O'
-        for v in KNOWN_VERBS:
-            if verb_full.startswith(v):
-                verb, inflection = v, verb_full[len(v):] or 'O'
-                break
+    def _parse_command(self, cmd):
+        """Parse the command into verb, modifier, and literals."""
+        match = re.match(r"([A-Z]+)(?:\s+([A-Z]+))?\s*(.*)", cmd.strip().upper())
+        if not match: raise ValueError("INVALID DIRECTIVE FORMAT")
+        verb, modifier, args_str = match.groups()
+        
+        if verb not in KNOWN_VERBS: raise ValueError(f"UNKNOWN VERB: {verb}")
+        if modifier and modifier not in KNOWN_MODIFIERS:
+            # If the second word is not a known modifier, it's part of the args
+            args_str = f"{modifier} {args_str}".strip()
+            modifier = 'NEUTRAL'
+
         literals = re.findall(r"'([^']*)'", args_str)
-        return verb, inflection, literals, args_str
+        return verb, modifier or 'NEUTRAL', literals, args_str
 
     def _get_verb_handlers(self):
-        """Get the dictionary of verb handlers."""
+        """Map combat verbs to handlers."""
         return {
-            'CREO': self._handle_creo, 'INSTAURO': self._handle_instauro,
-            'FOCUS': self._handle_focus, 'OSTENDO': self._handle_ostendo,
-            'PERTURBO': self._handle_perturbo, 'CONVERGO': self._handle_convergo,
-            'INTERROGO': self._handle_interrogo,
+            'CREATE': self._handle_create, 'FOCUS': self._handle_focus,
+            'STATUS': self._handle_status, 'ENGAGE': self._handle_engage,
+            'DISENGAGE': self._handle_disengage, 'INTERROGATE': self._handle_interrogate
         }
 
-    def _handle_creo(self, inf, mod, lit, args):
-        """Handle CREO command: Create a new materia."""
-        name = lit[0].upper() if lit else "ANONYMOUS"
-        if name in self.materiae: return f"'{name}' IAM EXISTIT"
-        self.materiae[name] = FluxCore()
-        self.focus = name
-        return f"CREO MATERIAM '{name}'."
+    # --- Verb Handlers (The "Act" part of OODA) ---
+    def _handle_create(self, mod, mods, lit, args):
+        """Create a new agent in the squadron."""
+        callsign = lit[0].upper() if lit else "WINGMAN"
+        if callsign in self.squadron: return f"CALLSIGN '{callsign}' ALREADY IN USE."
+        self.squadron[callsign] = FluxCore()
+        self.target = callsign
+        return f"AGENT '{callsign}' ADDED TO SQUADRON."
 
-    def _handle_instauro(self, inf, mod, lit, args):
-        """Handle INSTAURO command: Create an intellectus."""
-        name = lit[0].upper()
-        arch = (re.search(r"MODO\s+'([^']*)'", args.upper()) or [None, 'TRANSFORMER'])[1]
-        if name in self.materiae: return f"'{name}' IAM EXISTIT"
-        self.materiae[name] = Intellectus(architecture=arch)
-        self.focus = name
-        return f"INSTAURO INTELLECTUM '{name}' MODO '{arch}'."
+    def _handle_focus(self, mod, mods, lit, args):
+        """Change target lock to another agent."""
+        callsign = lit[0].upper()
+        if callsign not in self.squadron: return f"AGENT '{callsign}' NOT FOUND."
+        self.target = callsign
+        return f"TARGET LOCK ON '{callsign}'."
 
-    def _handle_focus(self, inf, mod, lit, args):
-        """Handle FOCUS command: Change focus to a materia."""
-        name = lit[0].upper()
-        if name not in self.materiae: return f"MATERIA '{name}' NON EXISTIT"
-        self.focus = name
-        return f"FOCUS NUNC IN '{name}'."
+    def _handle_status(self, mod, mods, lit, args):
+        """Report the status of an agent."""
+        agent_to_report = lit[0].upper() if lit else self.target
+        if agent_to_report not in self.squadron: return f"AGENT '{agent_to_report}' NOT FOUND."
+        return self.squadron[agent_to_report].display()
 
-    def _handle_ostendo(self, inf, mod, lit, args):
-        """Handle OSTENDO command: Display a materia."""
-        name_to_show = lit[0].upper() if lit else self.focus
-        if name_to_show not in self.materiae: return f"MATERIA '{name_to_show}' NON EXISTIT"
-        return self.materiae[name_to_show].display()
-
-    def _handle_perturbo(self, inf, mod, lit, args):
-        """Handle PERTURBO command: Perturb the materia."""
-        core = self.get_focused_materia()
+    def _handle_engage(self, mod, mods, lit, args):
+        """Command an agent to perform an offensive maneuver."""
+        agent = self.get_targeted_agent()
         amp = text_to_amp(lit[0]) if lit else 10.0
-        thrust_change = amp * 0.1 * mod
-        load_factor_change = amp * 0.01 * mod
-        core.maneuver(thrust_change, load_factor_change)
-        return f"MANEUVER COMPLETE. Es={core.specific_energy:.2f}"
+        thrust_change = amp * 0.1 * mods['thrust_mod']
+        load_factor_change = amp * 0.01 * mods['load_mod']
+        agent.maneuver(thrust_change, load_factor_change)
+        return f"ENGAGING. Es={agent.specific_energy:.2f}"
 
-    def _handle_convergo(self, inf, mod, lit, args):
-        """Handle CONVERGO command: Stabilize the materia."""
-        core = self.get_focused_materia()
-        core.stabilize()
-        return f"STABILIZING. Es={core.specific_energy:.2f}"
+    def _handle_disengage(self, mod, mods, lit, args):
+        """Command an agent to perform a stabilizing/defensive maneuver."""
+        agent = self.get_targeted_agent()
+        agent.stabilize()
+        return f"DISENGAGING. Es={agent.specific_energy:.2f}"
 
-    def _handle_interrogo(self, inf, mod, lit, args):
-        """Handle INTERROGO command: Query the oracle."""
-        core = self.get_focused_materia()
-        model_name = (re.search(r"ORACULO\s+'([^']*)'", args.upper()) or [None, 'gemini-1.5-flash'])[1]
-        oracle = get_oracle(model_name)
-        prompt = lit[0] if lit else "Describe your current energy state."
-        response = oracle.query(prompt)
+    async def _handle_interrogate(self, mod, mods, lit, args):
+        """Query intel for a tactical update (Orient/Decide)."""
+        agent = self.get_targeted_agent()
+        model_key = (re.search(r"INTEL\s+'([^']*)'", args.upper()) or [None, 'ollama_phi3'])[1]
+
+        try:
+            player = load_player(model_key)
+        except Exception as e:
+            return f"INTEL FAILURE: Could not load model '{model_key}'. {e}"
+
+        prompt = lit[0] if lit else "Assess current energy state and recommend next maneuver."
         
-        if "ORACULUM ERRORUM" in response:
-            return response
+        async with aiohttp.ClientSession() as session:
+            response_data = await player.get_response(prompt, session)
         
-        amp = text_to_amp(response)
-        core.maneuver(amp * 0.2, amp * 0.02)
-        core.context_embeddings['ORACULUM_RESPONSUM'] = response
-        return f"ORACULUM RESPONDIT. MANEUVER INITIATED."
+        if "error" in response_data:
+            return f"INTEL FAILURE: {response_data['error']}"
+
+        response_text = response_data.get('response', str(response_data))
+        amp = text_to_amp(response_text)
+        
+        # Act on the intel immediately
+        agent.maneuver(amp * 0.2 * mods['thrust_mod'], amp * 0.02 * mods['load_mod'])
+        agent.context_embeddings['LATEST_INTEL'] = response_text
+        return f"INTEL RECEIVED. MANEUVERING BASED ON NEW DATA."
 
 # --- Main Execution Logic ---
-def main():
+async def main():
     context = Contextus()
     print("\n--- AetherOS E-M REPL ---")
-    print("Type 'vale' to quit.")
+    print("Directives: CREATE, FOCUS, STATUS, ENGAGE, DISENGAGE, INTERROGATE")
+    print("Modifiers: AGGRESSIVE, DEFENSIVE, NEUTRAL, IMMEDIATE")
+    print("Example: ENGAGE AGGRESSIVE 'BREAK RIGHT'")
+    print("Type 'vale' to exit.")
+    
     while True:
         try:
-            cmd = input(f"aetheros({context.focus})> ")
+            cmd = await asyncio.to_thread(input, f"aetheros({context.target})> ")
             if cmd.lower() in ['exit', 'vale']: break
             if not cmd.strip(): continue
-            response = context.execute_command(cmd)
+            response = await context.execute_command(cmd)
             print(f"< {response}")
         except (EOFError, KeyboardInterrupt):
-            print("\n< Cleaning up threads... >")
-            # Add cleanup for any threads if needed
             break
-    print("\n< VALE.")
+    print("\n< SIMULATOR OFFLINE.")
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] == 'test':
-        unittest.main()
-    else:
-        main()
+    asyncio.run(main())

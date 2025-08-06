@@ -10,7 +10,7 @@ import torch.optim as optim
 import numpy as np
 
 # Import our model and device configuration
-from hrm_agent import HRM, device
+from animus.auctores.hrm_agent import HRM, device
 
 # --- Environment & Data Generation ---
 

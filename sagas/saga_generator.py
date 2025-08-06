@@ -1,101 +1,112 @@
-# saga_generator.py
-#
-# This module takes the results of a local_minima_test run and uses an
-# LLM to generate a narrative "Saga" in the form of a JSON story file.
+# sagas/saga_generator.py
+# This module generates a narrative Saga from a test run log using a
+# model from the central registry.
 
 import json
-from oracle import get_oracle # We reuse our existing oracle to query an LLM
+import asyncio
+import aiohttp
+import argparse
+from experiri.model_loader import load_player
 
 class SagaGenerator:
-    """
-    Generates a narrative Saga from a test run log.
-    """
+    """Generates a narrative Saga from a test run log."""
 
-    def __init__(self, model_name="gemma:7b"):
+    def __init__(self, model_key=None):
         """
-        Initializes the generator with a specific LLM model.
+        Initializes the generator. If no model_key is provided, it will
+        prompt the user to select one.
+        """
+        if model_key:
+            self.player = load_player(model_key)
+        else:
+            self.player = self.prompt_for_player()
+        
+        if self.player:
+            print(f"SagaGenerator initialized with player for model: {self.player.model_name}")
 
-        Args:
-            model_name (str): The name of the LLM to use for generation
-                              (e.g., gemma:7b, gemini-1.5-flash).
-        """
-        self.oracle = get_oracle(model_name)
-        print(f"SagaGenerator initialized with oracle: {model_name}")
+    def prompt_for_player(self):
+        """Prompts the user to select a model if none was specified via arguments."""
+        print("\n--- Model Selection for Saga Generation ---")
+        try:
+            with open('models/model_registry.json', 'r') as f:
+                registry = json.load(f)
+            
+            print("Available models:")
+            # We only want to list LLMs, not specialized models like the HRM
+            llm_keys = [k for k, v in registry.items() if v.get('type') != 'hrm']
+            for i, key in enumerate(llm_keys):
+                print(f"  {i+1}: {key}")
+            
+            while True:
+                choice = input(f"Select a model by number (1-{len(llm_keys)}): ")
+                if choice.isdigit() and 1 <= int(choice) <= len(llm_keys):
+                    selected_key = llm_keys[int(choice) - 1]
+                    return load_player(selected_key)
+                else:
+                    print("Invalid selection. Please try again.")
+        except Exception as e:
+            print(f"Could not load models from registry: {e}")
+            return None
 
     def _build_prompt(self, run_log):
-        """
-        Builds a detailed prompt for the LLM to generate the Saga.
-        """
-        path_string = " -> ".join(map(str, run_log['path_history']))
-        final_outcome = "SUCCESS" if run_log['success'] else "FAILURE (stuck in a loop)"
+        """Builds a detailed prompt for the LLM to generate the Saga."""
+        path_string = " -> ".join(map(str, run_log.get('path_history', [])))
+        success = run_log.get('success', False)
+        final_outcome = "SUCCESS" if success else "FAILURE (stuck in a loop)"
 
-        prompt = f"""
-        Analyze the following log from an AI agent's attempt to solve a maze puzzle.
-        The agent's goal was to travel from (0, 0) to (10, 10).
+        return (
+            f"Analyze the following log from an AI agent's maze attempt from (0, 0) to (10, 10).\n"
+            f"- Path: {path_string}\n- Outcome: {final_outcome}\n\n"
+            f"Your task is to convert this into a brief, allegorical story as a JSON array of AetherOS commands.\n"
+            f"- Agent is 'NAVIGATOR'. Use PERTURBO for journey points. End with REDIMO on failure or OSTENDO on success. "
+            f"Conclude with a 'vale' command.\n\n"
+            f"IMPORTANT: Respond with only the valid JSON array of strings. Do not include any other text, explanations, or markdown."
+        )
 
-        - Agent's Path: {path_string}
-        - Final Outcome: {final_outcome}
-
-        Your task is to convert this journey into a brief, allegorical story formatted as a sequence of AetherOS commands in a JSON array.
+    async def generate(self, run_log, output_filename):
+        """Generates and saves the Saga JSON file."""
+        if not self.player:
+            print("--- ERROR: SagaGenerator player not initialized. Aborting. ---")
+            return False
         
-        - Use "CREO 'NAVIGATOR'" for the agent.
-        - Use "PERTURBO" commands to describe key parts of the journey, like starting, getting stuck against the wall (around x=5), or reaching the goal.
-        - If the agent failed, end the story with a "REDIMO 'NAVIGATOR'" command to represent its dissolution.
-        - If the agent succeeded, end with "OSTENDO 'NAVIGATOR'".
-        - Conclude with a "vale" command.
-        
-        Output only the valid JSON array of strings. Do not include any other text or explanations.
-        """
-        return prompt
-
-    def generate(self, run_log, output_filename):
-        """
-        Generates and saves the Saga JSON file.
-
-        Args:
-            run_log (dict): A dictionary containing the results of the test run.
-                            Expected keys: 'path_history', 'success'.
-            output_filename (str): The path to save the generated JSON file.
-        """
-        print(f"\nGenerating Saga for run, saving to {output_filename}...")
+        print(f"\nGenerating Saga using {self.player.model_name}, saving to {output_filename}...")
         prompt = self._build_prompt(run_log)
 
         try:
-            # Query the LLM to get the command list
-            response_text = self.oracle.query(prompt)
-            # The oracle might return the JSON wrapped in markdown, so we extract it.
-            json_start = response_text.find('[')
-            json_end = response_text.rfind(']') + 1
-            if json_start == -1 or json_end == 0:
-                raise json.JSONDecodeError("No JSON array found in response.", response_text, 0)
-            
-            story_commands = json.loads(response_text[json_start:json_end])
+            async with aiohttp.ClientSession() as session:
+                # All player types now return a consistent, parsed Python dictionary.
+                # The SagaGenerator is now completely agnostic of the model source.
+                story_commands = await self.player.get_response(prompt, session)
 
-            # Save the commands to the output file
+            if isinstance(story_commands, dict) and "error" in story_commands:
+                raise ValueError(story_commands["error"])
+
             with open(output_filename, 'w') as f:
                 json.dump(story_commands, f, indent=2)
             
             print(f"Saga successfully generated and saved.")
             return True
-
-        except (json.JSONDecodeError, Exception) as e:
-            print(f"--- ERROR: Failed to generate or parse Saga. ---")
-            print(f"Error: {e}")
+        except Exception as e:
+            print(f"--- ERROR: Failed to generate or parse Saga: {e} ---")
             return False
 
-# --- Example Usage ---
-if __name__ == '__main__':
-    # This is mock data representing a failed run where the agent got stuck
+async def main():
+    """Sets up and runs the SagaGenerator."""
+    parser = argparse.ArgumentParser(description="Generate a narrative Saga from a mock log.")
+    parser.add_argument('--model', type=str, default=None,
+                        help="Key for the model from model_registry.json (e.g., ollama_phi3). If not provided, will prompt.")
+    
+    args = parser.parse_args()
+
     mock_run_log = {
-        'path_history': [
-            (0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (4, 5), 
-            (4, 4), (4, 5), (4, 4) 
-        ],
+        'path_history': [(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (4, 3), (4, 2)], 
         'success': False
     }
+    
+    # Instantiate with a key from arguments, or let it prompt the user
+    saga_gen = SagaGenerator(model_key=args.model)
+    if saga_gen.player:
+        await saga_gen.generate(mock_run_log, "saga_run_0.json")
 
-    # Instantiate the generator
-    saga_gen = SagaGenerator()
-
-    # Generate the saga file from the mock log
-    saga_gen.generate(mock_run_log, "saga_run_0.json")
+if __name__ == '__main__':
+    asyncio.run(main())

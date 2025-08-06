@@ -19,3 +19,6 @@ dist/
 # IDE / Editor specific
 .vscode/
 .idea/
+
+# Python Virtual Environments
+.venv/
