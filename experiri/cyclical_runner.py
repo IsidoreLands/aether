@@ -1,189 +1,167 @@
-# experiri/cyclical_runner.py
-#
-# Manages the full SAGA learning loop. It runs a test with a Saga-aware agent,
-# generates a new Saga, and passes it as context for the next run, enabling
-# the agent to learn from its history.
+# experiri/cyclical_runner.py (Final Synchronized Version)
 
+import sys
+import os
 import json
 import asyncio
 import argparse
-import os
 import aiohttp
 import torch
 import numpy as np
-import requests # For ntfy
+import requests 
 
-# Import our definitive components
+# --- Add the project root to the Python path ---
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
+# --- Core AetherOS Components ---
+from flux_core import FluxCore
 from experiri.model_loader import load_player
 from sagas.saga_generator import SagaGenerator
-from experiri.baseline_runner import FortifiedGridEnvironment, DefinitiveHRMPlayer
+from experiri.baseline_runner import FortifiedGridEnvironment
 
-MAX_STEPS_PER_CYCLE = 30 # Give it a few extra steps to find a solution
-
-# --- ntfy Notification Setup ---
+# --- Configuration & Globals ---
+MAX_STEPS_PER_CYCLE = 30
 NTFY_TOPIC = "roma"
+CYCLE_NAMES = ["Departure", "Trials", "Crucible", "Return", "Ascension"]
+
 def send_notification(title, message, priority="default", tags=None):
-    """Sends a push notification to the specified ntfy.sh topic."""
     headers = {"Title": title, "Priority": priority, "Tags": tags if tags else ""}
     try:
         requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", data=message.encode('utf-8'), headers=headers)
     except Exception as e:
         print(f"--- WARNING: Failed to send notification: {e} ---")
 
-# --- NEW: The Saga-Aware HRM Player ---
-class SagaAwareHRMPlayer(DefinitiveHRMPlayer):
-    """
-    An evolution of the HRM player that can process an abstract, linguistic
-    Saga into its state vector, allowing it to learn from history.
-    """
-    def __init__(self, config):
-        # We add 4 more dimensions for the saga context embedding
-        config['input_dim'] = 14 # 10 (base state) + 4 (saga embedding)
-        super().__init__(config)
+def text_to_amp(text):
+    return np.log1p(sum(ord(c) for c in text))
 
-    def _embed_saga(self, saga_context):
-        """A simple method to convert a Saga (list of strings) into a numeric vector."""
-        if not saga_context:
-            return [0.0, 0.0, 0.0, 0.0] # Neutral context
-
-        # Simple embedding: count keywords related to failure, success, movement
-        text = " ".join(saga_context).upper()
-        failure_score = text.count("REDIMO") + text.count("FAILURE")
-        success_score = text.count("OSTENDO") + text.count("SUCCESS")
-        
-        # A crude measure of "stuckness"
-        stuck_score = 0
-        if "BLOCKED" in text and failure_score > 0:
-             # Count how many times it was blocked
-             stuck_score = text.count("BLOCKED") / 10.0 # Normalize
-
-        # A measure of exploration/movement
-        move_score = text.count("PERTURBO") / 20.0 # Normalize
-        
-        return [
-            np.clip(failure_score, 0, 1),
-            np.clip(success_score, 0, 1),
-            np.clip(stuck_score, 0, 1),
-            np.clip(move_score, 0, 1)
-        ]
-
-    def _get_state_tensor(self, env_state):
-        """Converts the full environment state, including the Saga, into a tensor."""
-        saga_embedding = self._embed_saga(env_state['saga_context'])
-        
-        # Standard 10D state from the definitive player
-        status_vec = [1.0, 0.0] if env_state['last_move_status'] == "Valid" else [0.0, 1.0]
-        base_state_array = np.array([
-            *env_state['current_pos'], *env_state['target_pos'],
-            *env_state['local_walls'], *status_vec
-        ], dtype=np.float32)
-
-        # Concatenate the base state with the saga embedding
-        full_state_array = np.concatenate([base_state_array, np.array(saga_embedding, dtype=np.float32)])
-        return torch.from_numpy(full_state_array).unsqueeze(0).to(self.device)
-
-
-async def run_learning_trial(hrm_agent, guide_agent, saga_context=None):
-    """Runs one trial of the experiment, using the provided Saga as context."""
+async def run_aetheric_learning_trial(hrm_agent, guide_agent, agent_animus, saga_context=None, all_past_sagas=None):
     env = FortifiedGridEnvironment()
-    path_history = [env.start]
-    last_move_status = "Valid"
+    path_history, last_move_status = [env.start], "Valid"
+    guide_critiques = []
+    consecutive_failures = 0
 
-    print(f"\n--- Running Learning Trial ---")
+    print(f"\n--- Running Aetheric Learning Trial ---")
+    print("Context: Saga from previous run provided." if saga_context else "Context: No Saga provided (first run).")
+
     if saga_context:
-        print("Context: Saga from previous run has been provided.")
-    else:
-        print("Context: No Saga provided (first run).")
+        saga_text = " ".join(saga_context)
+        agent_animus.perturb(np.random.randint(0, agent_animus.size-1), 
+                             np.random.randint(0, agent_animus.size-1), 
+                             text_to_amp(saga_text))
+    
+    agent_animus.converge()
+    print(f"  Animus State: R={agent_animus.resistance:.2e}, C={agent_animus.capacitance:.2f}, M={agent_animus.magnetism:.2f}")
 
     async with aiohttp.ClientSession() as session:
         for step in range(1, MAX_STEPS_PER_CYCLE + 1):
             current_pos = env.position
             
-            # The full state now includes the historical saga context
+            lifeline_context = None
+            if consecutive_failures >= 3 and all_past_sagas:
+                print(f"  !!! LIFELINE TRIGGERED: Agent is stuck. Providing all prior sagas as context. !!!")
+                lifeline_context = [cmd for saga in all_past_sagas for cmd in saga]
+                consecutive_failures = 0
+
             hrm_state = {
                 'current_pos': current_pos, 'target_pos': env.target,
                 'local_walls': env.get_local_env_state(current_pos),
-                'last_move_status': last_move_status,
-                'saga_context': saga_context
+                'last_move_status': last_move_status, 
+                'saga_context': saga_context,
+                'lifeline_context': lifeline_context,
+                'animus_sextet': agent_animus.get_sextet()
             }
 
             hrm_response = await hrm_agent.get_response(hrm_state, session)
             proposed_move = hrm_response['move']
+
+            guide_prompt = f"Agent at {current_pos} proposes {proposed_move}. Goal is {env.target}, wall at x=5. Critique this move in a JSON: {{\"critique\": \"...\"}}"
+            guide_response = await guide_agent.get_response(guide_prompt, session)
+            guide_critiques.append(guide_response)
+            
+            critique_text = guide_response.get('critique', '')
+            if critique_text:
+                agent_animus.perturb(np.random.randint(0, agent_animus.size-1), 
+                                     np.random.randint(0, agent_animus.size-1),
+                                     text_to_amp(critique_text) * -0.5)
+                agent_animus.converge()
+
             move_result = env.move(proposed_move)
             last_move_status = move_result
+            
+            if move_result == "Blocked": consecutive_failures += 1
+            else: consecutive_failures = 0
 
-            # The guide is no longer needed in the loop, but we could add it back for richer sagas
             print(f"  Step {step} | Pos: {current_pos} | HRM Proposes: {proposed_move} | Result: {move_result}")
 
             if move_result == "Success":
                 path_history.append(env.position)
                 print("\n  SUCCESS! The agent has learned to solve the trap.")
-                return {'path_history': path_history, 'success': True}
+                return {'path_history': path_history, 'success': True, 'critiques': guide_critiques}
 
             if move_result not in ["Blocked", "InvalidFormat", "OutOfBounds"]:
                 path_history.append(env.position)
 
     print(f"\n  FAILURE! Step limit reached in this learning trial.")
-    return {'path_history': path_history, 'success': False}
+    return {'path_history': path_history, 'success': False, 'critiques': guide_critiques}
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="Run the SAGA LEARNING experiment.")
-    parser.add_argument('--cycles', type=int, default=5, help="Number of learning cycles to run.")
-    parser.add_argument('--hrm_key', type=str, default='hrm_definitive', help="Key for the HRM agent config.")
-    parser.add_argument('--saga_key', type=str, default='ollama_phi3', help="Model key for Saga generation.")
+    parser = argparse.ArgumentParser(description="Run the SAGA v3.0 AETHERIC LEARNING experiment.")
+    parser.add_argument('--cycles', type=int, default=5, help="Number of learning cycles.")
+    parser.add_argument('--hrm_key', type=str, default='ARC', help="Key for the ARC agent.")
+    parser.add_argument('--guide_key', type=str, default='ollama_phi3', help="Key for the Guide LLM.")
+    parser.add_argument('--saga_key', type=str, default='ollama_phi3', help="Key for Saga generation.")
     args = parser.parse_args()
 
-    start_message = f"Starting {args.cycles}-cycle SAGA learning experiment."
+    start_message = f"Starting {args.cycles}-cycle AETHERIC learning experiment."
     send_notification("Aether Learning Started", start_message, priority="high", tags="brain")
-    
     success_count = 0
+    
     try:
-        print("="*50)
-        print("      STARTING SAGA LEARNING RUNNER")
-        print("="*50)
-
-        # We load the HRM config, but instantiate our new Saga-aware player
-        with open('models/model_registry.json', 'r') as f:
-            registry = json.load(f)
-        hrm_config = registry[args.hrm_key]
-        hrm_agent = SagaAwareHRMPlayer(hrm_config)
+        print("="*50); print("      STARTING AETHERIC SAGA LEARNING RUNNER"); print("="*50)
+        
+        hrm_agent = load_player(args.hrm_key)
+        guide_agent = load_player(args.guide_key)
         saga_generator = SagaGenerator(model_key=args.saga_key)
-
+        
+        agent_animus = FluxCore()
+        
         os.makedirs("sagas/generated", exist_ok=True)
         saga_context = None
+        all_sagas = []
 
         for i in range(args.cycles):
             cycle_num = i + 1
-            print(f"\n{'='*20} CYCLE {cycle_num}/{args.cycles} {'='*20}")
-            run_log = await run_learning_trial(hrm_agent, None, saga_context)
+            cycle_name = CYCLE_NAMES[i] if i < len(CYCLE_NAMES) else f"Cycle {cycle_num}"
+            print(f"\n{'='*20} CYCLE {cycle_num}/{args.cycles} ({cycle_name}) {'='*20}")
+            
+            past_sagas_for_lifeline = all_sagas if cycle_name not in ["Departure", "Trials"] else None
+            
+            run_log = await run_aetheric_learning_trial(hrm_agent, guide_agent, agent_animus, saga_context, past_sagas_for_lifeline)
             if run_log.get('success'):
                 success_count += 1
-
-            output_filename = f"sagas/generated/learning_run_{cycle_num}.json"
-            await saga_generator.generate(run_log, output_filename, max_retries=2)
-
+            
+            output_filename = f"sagas/generated/aetheric_run_{cycle_num}.json"
+            await saga_generator.generate(run_log, run_log['critiques'], output_filename, max_retries=2)
+            
             try:
-                with open(output_filename, 'r') as f:
-                    saga_context = json.load(f)
+                with open(output_filename, 'r') as f: 
+                    new_saga = json.load(f)
+                    saga_context = new_saga
+                    all_sagas.append(new_saga)
                 print(f"Loaded '{output_filename}' as context for the next cycle.")
             except Exception:
-                print(f"Could not load Saga from {output_filename}. Proceeding without context."); saga_context = None
+                print(f"Could not load Saga. Proceeding without context."); saga_context = None
     
     except Exception as e:
-        error_message = f"Learning experiment CRASHED: {e}"
-        print(f"\n--- FATAL ERROR: {error_message} ---")
-        send_notification("Aether Learning CRASHED", error_message, priority="urgent", tags="x")
-        raise
+        error_message = f"Learning experiment CRASHED: {e}"; print(f"\n--- FATAL ERROR: {error_message} ---")
+        send_notification("Aether Learning CRASHED", error_message, priority="urgent", tags="x"); raise
     
     finally:
-        completion_message = f"Learning complete. {success_count}/{args.cycles} cycles were successful."
-        print("\n" + "="*50)
-        print("      ALL LEARNING CYCLES COMPLETE")
-        print(f"      Success Rate: {success_count}/{args.cycles}")
-        print("="*50)
+        completion_message = f"Aetheric learning complete. {success_count}/{args.cycles} cycles successful."
+        print("\n" + "="*50); print("      ALL AETHERIC CYCLES COMPLETE"); print(f"      Success Rate: {success_count}/{args.cycles}"); print("="*50)
         send_notification("Aether Learning Complete", completion_message, priority="high", tags="tada")
-
 
 if __name__ == '__main__':
     asyncio.run(main())

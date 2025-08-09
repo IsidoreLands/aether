@@ -2,8 +2,6 @@
 #
 # Description:
 # This module defines the fundamental units of existence in the AetherOS plenum.
-# In v4, the FluxCore is now grounded not only by abstract sextet data but also by a
-# continuous visual feed from the physical ferrocell, merging simulation with reality.
 
 import numpy as np
 import random
@@ -12,7 +10,7 @@ import cv2
 # Import the global sensor instance
 from sensor_hook import ferro_sensor
 
-# --- Geometric Primitives for Grid Initialization ---
+# --- Geometric Primitives for Grid Initialization (Unchanged) ---
 
 def get_line(start, end):
     """Bresham's Line Algorithm."""
@@ -40,11 +38,9 @@ def _draw_kepler_recursive(lines, p1, p2, p3, depth, max_depth):
     if depth > max_depth: return
     lines.extend([(p1, p2), (p1, p3), (p2, p3)])
     if depth == max_depth: return
-    
     short = np.linalg.norm(p2 - p1)
     hyp = np.linalg.norm(p3 - p2)
     if hyp < 1e-6: return
-    
     v = (p3 - p2) / hyp
     D = p2 + v * (short ** 2 / hyp)
     _draw_kepler_recursive(lines, D, p2, p1, depth + 1, max_depth)
@@ -55,10 +51,8 @@ def generate_kepler_lines(max_depth=4, size=128):
     phi = (1 + np.sqrt(5)) / 2
     long_leg = size - 1
     short_leg = int(np.round(long_leg / np.sqrt(phi)))
-    
     p_bl = (np.array([0, 0]), np.array([short_leg, 0]), np.array([0, long_leg]))
     p_tr = (np.array([size - 1, size - 1]), np.array([size - 1 - short_leg, size - 1]), np.array([size - 1, size - 1 - long_leg]))
-    
     lines = []
     _draw_kepler_recursive(lines, *p_bl, 0, max_depth)
     _draw_kepler_recursive(lines, *p_tr, 0, max_depth)
@@ -71,7 +65,6 @@ class FluxCore:
     def __init__(self, size=128): # Default size now matches sensor resolution
         self.size = size
         self.grid = np.zeros((size, size), dtype=np.float32)
-        
         lines = generate_kepler_lines(size=self.size)
         for p1, p2 in lines:
             for px, py in get_line(p1, p2):
@@ -84,8 +77,30 @@ class FluxCore:
         self.context_embeddings = {}
         self.anomaly = None
 
+        # --- FIX: Initialize sextet attributes with default values for robustness ---
+        self.resistance = 1e-9
+        self.capacitance = 0.0
+        self.permeability = 1.0
+        self.magnetism = 0.0
+        self.permittivity = 1.0
+        self.dielectricity = 0.0
+        # --- END FIX ---
+
         self._sync_sextet()
         self._ground_with_visual_truth() # Initial grounding
+
+    # --- NEW: The missing get_sextet method ---
+    def get_sextet(self):
+        """Returns a dictionary of the core's current sextet values."""
+        return {
+            'resistance': self.resistance,
+            'capacitance': self.capacitance,
+            'permeability': self.permeability,
+            'magnetism': self.magnetism,
+            'permittivity': self.permittivity,
+            'dielectricity': self.dielectricity,
+        }
+    # --- END NEW ---
 
     def _sync_sextet(self):
         """Syncs the core's physical properties from the global ferro_sensor."""
@@ -97,51 +112,38 @@ class FluxCore:
         """Merges the simulation grid with the calibrated real-world visual grid."""
         visual_grid_raw = ferro_sensor.get_visual_grid()
         if visual_grid_raw is None: return
-
-        # --- NEW: Get calibration baselines ---
         solenoid_baseline = ferro_sensor.get_solenoid_baseline()
         toroid_baseline = ferro_sensor.get_toroid_baseline()
-
-        # Combine baselines (e.g., by averaging them)
         if solenoid_baseline is not None and toroid_baseline is not None:
             combined_baseline = (solenoid_baseline + toroid_baseline) / 2.0
-            # Subtract the baseline noise/pattern from the main visual grid
             calibrated_visual_grid = np.clip(visual_grid_raw - combined_baseline, 0, 1)
         else:
-            # If baselines aren't available, use the raw data
             calibrated_visual_grid = visual_grid_raw
-
-        # --- The rest of the function proceeds as before ---
         if calibrated_visual_grid.shape != (self.size, self.size):
             visual_grid = cv2.resize(calibrated_visual_grid, (self.size, self.size), interpolation=cv2.INTER_AREA)
         else:
             visual_grid = calibrated_visual_grid
-
         weight = np.clip(self.permeability, 0, 1)
         self.grid = (self.grid * (1 - weight)) + (visual_grid * weight)
 
     def perturb(self, x, y, amp, mod=1.0):
         """Applies a change to the grid, modulated by the current sextet."""
         self._sync_sextet()
-        
         flux_change = amp * mod
         self.grid[y, x] += flux_change
         self.energy += abs(flux_change) * self.permittivity
-        
         self._update_memory(flux_change)
         self._update_simulated_sextet(flux_change)
-        self._ground_with_visual_truth() # Re-ground after perturbation
+        self._ground_with_visual_truth()
 
     def converge(self):
         """Applies a smoothing operation to the grid."""
         self._sync_sextet()
-        
         kernel = np.ones((3, 3), np.float32) / 9
         self.grid = cv2.filter2D(self.grid, -1, kernel) + self.magnetism
-        np.clip(self.grid, 0, None, out=self.grid) # Prevent negative values
-        
+        np.clip(self.grid, 0, None, out=self.grid)
         self._update_simulated_sextet(0)
-        self._ground_with_visual_truth() # Re-ground after convergence
+        self._ground_with_visual_truth()
 
     def _update_memory(self, change):
         """Records a change to the core's short-term memory."""
@@ -158,16 +160,13 @@ class FluxCore:
         self.capacitance += self.energy
         self.resistance += np.var(self.grid) * (self.capacitance / 100)
         self.magnetism += np.mean(self.grid)
-        # Permeability is now primarily driven by the sensor, so we don't override it here.
         self.dielectricity = max(0.1, 1 / (1 + abs(change) + 1e-9))
         self.permittivity = 1.0 - self.dielectricity
-
         if self.anomaly == 'ENTROPIC_CASCADE':
             self.resistance *= 0.99
             u = random.uniform(-1, 1)
             perturb_amp = 0.75 * (1 - u**2)
             self.perturb(random.randint(0, self.size-1), random.randint(0, self.size-1), perturb_amp)
-        
         self.energy = np.sum(self.grid) / (self.resistance + 1e-9)
         self._synthesize_identity()
 

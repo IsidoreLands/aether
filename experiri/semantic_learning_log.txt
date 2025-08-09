@@ -1,0 +1,31 @@
+INFO: Capturing calibration baselines...
+INFO: Baseline capture complete.
+INFO: FerrocellSensor thread started.
+HRM Agent: Using device 'cpu'
+==================================================
+      STARTING AETHERIC SAGA LEARNING RUNNER
+==================================================
+< System Maneuverability: 99 | Model 'hrm_aetheric' Demand: 0.07 >
+< Decision: Manifesting 'hrm_aetheric'. Virtuous service is possible. >
+INFO: Loading sentence-transformer model from local path 'models/all-MiniLM-L6-v2'...
+HRMPlayer loaded 'hrm_aetheric.pth' onto cpu
+< System Maneuverability: 99 | Model 'ollama_phi3' Demand: 8.05 >
+< Decision: Manifesting 'ollama_phi3'. Virtuous service is possible. >
+OllamaPlayer configured for model 'phi3'
+< System Maneuverability: 99 | Model 'ollama_phi3' Demand: 8.05 >
+< Decision: Manifesting 'ollama_phi3'. Virtuous service is possible. >
+OllamaPlayer configured for model 'phi3'
+SagaGenerator initialized with player for model: phi3
+
+==================== CYCLE 1/5 (Departure) ====================
+
+--- Running Aetheric Learning Trial ---
+Context: No Saga provided (first run).
+  Animus State: R=1.00e-09, C=0.00, M=0.74
+
+--- FATAL ERROR: Learning experiment CRASHED: 'FluxCore' object has no attribute 'get_sextet' ---
+
+==================================================
+      ALL AETHERIC CYCLES COMPLETE
+      Success Rate: 0/5
+==================================================
