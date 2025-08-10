@@ -5,8 +5,13 @@ import torch
 import numpy as np
 from sentence_transformers import SentenceTransformer
 import json
-
+import os
+from dotenv import load_dotenv
+import logging # Add logging import
 from animus.auctores.hrm_agent import HRM
+import requests
+import aiohttp      # <-- ADD THIS IMPORT
+import asyncio      # <-- ADD THIS IMPORT FOR TIMEOUTERROR
 
 # --- Base Player ---
 class HRMPlayer:
@@ -80,19 +85,80 @@ class ARCPlayer(SemanticHRMPlayer):
         proposed_pos = (state['current_pos'][0] + dx, state['current_pos'][1] + dy)
         return {"move": proposed_pos}
 
-# --- LLM Player (Unchanged) ---
+# --- LLM Player  ---
+class HuggingFacePlayer:
+    """A player for interacting with the Hugging Face Inference API."""
+    def __init__(self, config):
+        load_dotenv() # Load the .env file if it exists
+        self.model_name = config['model_name']
+        self.endpoint = f"https://api-inference.huggingface.co/models/{self.model_name}"
+        self.api_key = os.getenv("HF_TOKEN")
+        if not self.api_key:
+            # Fallback to reading the cached token file
+            try:
+                with open(os.path.expanduser('~/.cache/huggingface/token'), 'r') as f:
+                    self.api_key = f.read().strip()
+            except FileNotFoundError:
+                 raise ValueError("HF_TOKEN not found in environment or cache. Please log in with 'hf auth login'.")
+        print(f"HuggingFacePlayer configured for model '{self.model_name}'")
+
+    async def get_response(self, prompt, session, env=None):
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        payload = {
+            "inputs": prompt,
+            "parameters": {"return_full_text": False, "max_new_tokens": 250, "temperature": 0.3},
+            "options": {"wait_for_model": True}
+        }
+        try:
+            async with session.post(self.endpoint, headers=headers, json=payload, timeout=60) as response:
+                response.raise_for_status()
+                response_json = await response.json()
+                response_text = response_json[0]['generated_text']
+                
+                # The response is a string containing JSON, so we must parse it
+                json_start = response_text.find('[')
+                if json_start == -1: json_start = response_text.find('{')
+                if json_start == -1: raise ValueError("No JSON object or array found in HF response.")
+                
+                return json.loads(response_text[json_start:])
+        except Exception as e:
+            # Return a dictionary with an error key for robust error handling
+            return {"error": f"Hugging Face API Error: {e}"}
+
+# --- "Bulletproof" OllamaPlayer ---
 class OllamaPlayer:
+    """A more robust player for interacting with local Ollama LLMs."""
     def __init__(self, config):
         self.model_name = config['model_name']
         self.endpoint = config['endpoint']
-        print(f"OllamaPlayer configured for model '{self.model_name}'")
-    async def get_response(self, prompt, session, env=None):
-        payload = {"model": self.model_name, "prompt": prompt, "stream": False, "format": "json", "options": {"temperature": 0.2}}
+        # Perform a quick health check on initialization
         try:
-            async with session.post(self.endpoint, json=payload, timeout=300) as response:
+            response = requests.head(self.endpoint.replace("/api/generate", ""), timeout=5)
+            response.raise_for_status()
+            print(f"OllamaPlayer configured for model '{self.model_name}'. Connection successful.")
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Ollama server is not reachable at {self.endpoint}. Please ensure it is running. Error: {e}")
+
+    async def get_response(self, prompt, session, env=None):
+        payload = {
+            "model": self.model_name, "prompt": prompt, "stream": False,
+            "format": "json", "options": {"temperature": 0.2}
+        }
+        logging.info(f"Sending prompt to Ollama model {self.model_name}: {prompt}")
+        try:
+            # Increased timeout for more patience
+            async with session.post(self.endpoint, json=payload, timeout=600) as response:
                 response.raise_for_status()
                 response_json = await response.json()
-                inner_json_str = response_json.get('response', '{}')
-                return json.loads(inner_json_str)
+                raw_response_content = response_json.get('response', '{}')
+                logging.info(f"Received raw response from Ollama: {raw_response_content}")
+                return json.loads(raw_response_content)
+        except aiohttp.ClientConnectorError as e:
+            logging.error(f"Ollama Connection Error: {e}")
+            return {"error": f"Ollama Connection Error: Could not connect to {self.endpoint}."}
+        except asyncio.TimeoutError:
+            logging.error("Ollama request timed out.")
+            return {"error": "Ollama request timed out after 10 minutes."}
         except Exception as e:
+            logging.error(f"Ollama API Error: {e}. Raw Response: {response_json if 'response_json' in locals() else 'N/A'}")
             return {"error": f"Ollama API Error: {e}"}

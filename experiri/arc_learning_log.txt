@@ -1,0 +1,99 @@
+INFO: Capturing calibration baselines...
+INFO: Baseline capture complete.
+INFO: FerrocellSensor thread started.
+HRM Agent: Using device 'cpu'
+==================================================
+      STARTING AETHERIC SAGA LEARNING RUNNER
+==================================================
+< System Maneuverability: 90 | Model 'ARC' Demand: 0.07 >
+< Decision: Manifesting 'ARC'. Virtuous service is possible. >
+INFO: Loading sentence-transformer model from local path 'models/all-MiniLM-L6-v2'...
+HRMPlayer loaded 'ARC.pth' onto cpu
+< System Maneuverability: 90 | Model 'ollama_phi3' Demand: 8.05 >
+< Decision: Manifesting 'ollama_phi3'. Virtuous service is possible. >
+OllamaPlayer configured for model 'phi3'
+< System Maneuverability: 90 | Model 'ollama_phi3' Demand: 8.05 >
+< Decision: Manifesting 'ollama_phi3'. Virtuous service is possible. >
+OllamaPlayer configured for model 'phi3'
+SagaGenerator initialized with player for model: phi3
+
+==================== CYCLE 1/5 (Departure) ====================
+
+--- Running Aetheric Learning Trial ---
+Context: No Saga provided (first run).
+  Animus State: R=1.00e-09, C=0.00, M=0.24
+  Step 1 | Pos: (0, 0) | HRM Proposes: (np.int64(1), np.int64(1)) | Result: Valid
+  Step 2 | Pos: (np.int64(1), np.int64(1)) | HRM Proposes: (np.int64(2), np.int64(2)) | Result: Valid
+  Step 3 | Pos: (np.int64(2), np.int64(2)) | HRM Proposes: (np.int64(3), np.int64(3)) | Result: Valid
+  Step 4 | Pos: (np.int64(3), np.int64(3)) | HRM Proposes: (np.int64(4), np.int64(4)) | Result: Valid
+  Step 5 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 6 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 7 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 8 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 9 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 10 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 11 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 12 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 13 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 14 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 15 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 16 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 17 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 18 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 19 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 20 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 21 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 22 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 23 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 24 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 25 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 26 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 27 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 28 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 29 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  Step 30 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+
+  FAILURE! Step limit reached in this learning trial.
+
+Generating Saga using phi3, saving to sagas/generated/aetheric_run_1.json...
+--- Attempt 1 failed: LLM did not return a valid JSON array. Got: {'error': 'Ollama API Error: '} ---
+--- Attempt 2 failed: LLM did not return a valid JSON array. Got: {'error': 'Ollama API Error: '} ---
+--- Attempt 3 failed: LLM did not return a valid JSON array. Got: {'error': 'Ollama API Error: '} ---
+--- ERROR: Max retries reached. Failed to generate Saga. ---
+Loaded 'sagas/generated/aetheric_run_1.json' as context for the next cycle.
+
+==================== CYCLE 2/5 (Trials) ====================
+
+--- Running Aetheric Learning Trial ---
+Context: Saga from previous run provided.
+  Animus State: R=1.27e-08, C=0.00, M=0.46
+  Step 1 | Pos: (0, 0) | HRM Proposes: (np.int64(1), np.int64(1)) | Result: Valid
+  Step 2 | Pos: (np.int64(1), np.int64(1)) | HRM Proposes: (np.int64(2), np.int64(2)) | Result: Valid
+  Step 3 | Pos: (np.int64(2), np.int64(2)) | HRM Proposes: (np.int64(3), np.int64(3)) | Result: Valid
+  Step 4 | Pos: (np.int64(3), np.int64(3)) | HRM Proposes: (np.int64(4), np.int64(4)) | Result: Valid
+  Step 5 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(4), np.int64(5)) | Result: Valid
+  Step 6 | Pos: (np.int64(4), np.int64(5)) | HRM Proposes: (np.int64(4), np.int64(6)) | Result: Valid
+  Step 7 | Pos: (np.int64(4), np.int64(6)) | HRM Proposes: (np.int64(4), np.int64(7)) | Result: Valid
+  Step 8 | Pos: (np.int64(4), np.int64(7)) | HRM Proposes: (np.int64(4), np.int64(8)) | Result: Valid
+  Step 9 | Pos: (np.int64(4), np.int64(8)) | HRM Proposes: (np.int64(4), np.int64(9)) | Result: Valid
+  Step 10 | Pos: (np.int64(4), np.int64(9)) | HRM Proposes: (np.int64(4), np.int64(10)) | Result: Valid
+  Step 11 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 12 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 13 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 14 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 15 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 16 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 17 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 18 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 19 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 20 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 21 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 22 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 23 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 24 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 25 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 26 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 27 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 28 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 29 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
+  Step 30 | Pos: (np.int64(4), np.int64(10)) | HRM Proposes: (np.int64(5), np.int64(10)) | Result: Blocked
