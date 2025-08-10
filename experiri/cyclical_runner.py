@@ -24,8 +24,10 @@ CYCLE_NAMES = ["Departure", "Trials", "Crucible", "Return", "Ascension"]
 
 def send_notification(title, message, priority="default", tags=None):
     headers = {"Title": title, "Priority": priority, "Tags": tags if tags else ""}
-    try: requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", data=message.encode('utf-8'), headers=headers)
-    except Exception as e: print(f"--- WARNING: Failed to send notification: {e} ---")
+    try:
+        requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", data=message.encode('utf-8'), headers=headers)
+    except Exception as e:
+        print(f"--- WARNING: Failed to send notification: {e} ---")
 
 def text_to_amp(text):
     return np.log1p(sum(ord(c) for c in text))
@@ -41,10 +43,19 @@ async def run_aetheric_learning_trial(hrm_agent, guide_agent, agent_animus, saga
     print("Context: Saga from previous run provided." if saga_context else "Context: No Saga provided (first run).")
 
     if saga_context:
-        saga_text = " ".join(saga_context)
+        # --- Robustly handle saga_context format ---
+        processed_saga_context = saga_context
+        if isinstance(saga_context, dict):
+            for key, value in saga_context.items():
+                if isinstance(value, list):
+                    processed_saga_context = value
+                    break
+        
+        saga_text = " ".join(map(str, processed_saga_context))
         agent_animus.perturb(np.random.randint(0, agent_animus.size-1), 
                              np.random.randint(0, agent_animus.size-1), 
                              text_to_amp(saga_text))
+    
     agent_animus.converge()
     print(f"  Animus State: R={agent_animus.resistance:.2e}, C={agent_animus.capacitance:.2f}, M={agent_animus.magnetism:.2f}")
 
@@ -106,13 +117,13 @@ async def run_aetheric_learning_trial(hrm_agent, guide_agent, agent_animus, saga
 
 
 async def main():
-    # ... (main function is unchanged and correct)
     parser = argparse.ArgumentParser(description="Run the SAGA v3.0 AETHERIC LEARNING experiment.")
     parser.add_argument('--cycles', type=int, default=5, help="Number of learning cycles.")
     parser.add_argument('--hrm_key', type=str, default='ARC', help="Key for the ARC agent.")
-    parser.add_argument('--guide_key', type=str, default='hf_phi3', help="Key for the Guide LLM.")
-    parser.add_argument('--saga_key', type=str, default='hf_phi3', help="Key for Saga generation.")
+    parser.add_argument('--guide_key', type=str, default='ollama_gemma2b', help="Key for the Guide LLM.")
+    parser.add_argument('--saga_key', type=str, default='ollama_gemma2b', help="Key for Saga generation.")
     args = parser.parse_args()
+
     start_message = f"Starting {args.cycles}-cycle AETHERIC learning experiment."; send_notification("Aether Learning Started", start_message, priority="high", tags="brain")
     success_count = 0
     try:
