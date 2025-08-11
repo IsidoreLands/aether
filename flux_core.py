@@ -16,7 +16,7 @@ from ferramenta.fluo.hardware_interface import RemoteFerrocell
 # Get the server URL from an environment variable for flexibility.
 REMOTE_FERROCELLA_URL = os.environ.get(
     "FERROCELLA_URL",
-    "http://placeholder.ngrok-free.app"
+    "https://ferrocella.ooda.wiki"
 )
 
 # Initialize the global hardware client
