@@ -9,7 +9,8 @@ from experiri.players import (
     SemanticHRMPlayer,
     ARCPlayer,
     OllamaPlayer,
-    HuggingFacePlayer 
+    HuggingFacePlayer, 
+    GeminiPlayer
 )
 
 SYSTEM_STATUS_PATH = "/tmp/sm_status.json"
@@ -20,7 +21,8 @@ PLAYER_CLASSES = {
     "SemanticHRMPlayer": SemanticHRMPlayer,
     "ARCPlayer": ARCPlayer,
     "OllamaPlayer": OllamaPlayer,
-    "HuggingFacePlayer": HuggingFacePlayer
+    "HuggingFacePlayer": HuggingFacePlayer,
+    "GeminiPlayer": GeminiPlayer
 }
 
 def get_system_state():

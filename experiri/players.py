@@ -162,3 +162,38 @@ class OllamaPlayer:
         except Exception as e:
             logging.error(f"Ollama API Error: {e}. Raw Response: {response_json if 'response_json' in locals() else 'N/A'}")
             return {"error": f"Ollama API Error: {e}"}
+
+class GeminiPlayer:
+    """A player for interacting with the Google Gemini API."""
+    def __init__(self, config):
+        load_dotenv() # Loads GEMINI_API_KEY from .env file
+        self.model_name = config['model_name']
+        self.endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
+        self.api_key = os.getenv("GEMINI_API_KEY")
+        if not self.api_key:
+            raise ValueError("GEMINI_API_KEY not found in .env file.")
+        print(f"GeminiPlayer configured for model '{self.model_name}'")
+
+    async def get_response(self, prompt, session, env=None):
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        full_url = f"{self.endpoint}?key={self.api_key}"
+        try:
+            async with session.post(full_url, json=payload, timeout=180) as response:
+                response.raise_for_status()
+                data = await response.json()
+                response_text = data['candidates'][0]['content']['parts'][0]['text']
+                
+                # Clean and parse the JSON response from the text
+                json_start = response_text.find('[')
+                if json_start == -1: json_start = response_text.find('{')
+                if json_start == -1: raise ValueError("No JSON found in Gemini response.")
+                
+                # Find the matching closing bracket/brace
+                if response_text[json_start] == '[':
+                    json_end = response_text.rfind(']') + 1
+                else:
+                    json_end = response_text.rfind('}') + 1
+
+                return json.loads(response_text[json_start:json_end])
+        except Exception as e:
+            return {"error": f"Gemini API Error: {e}"}

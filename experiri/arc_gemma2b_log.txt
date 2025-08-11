@@ -1,0 +1,100 @@
+INFO: Capturing calibration baselines...
+INFO: Baseline capture complete.
+INFO: FerrocellSensor thread started.
+HRM Agent: Using device 'cpu'
+==================================================
+      STARTING AETHERIC SAGA LEARNING RUNNER
+==================================================
+< System Maneuverability: 98 | Model 'ARC' Demand: 0.07 >
+< Decision: Manifesting 'ARC'. Virtuous service is possible. >
+INFO: Loading sentence-transformer model from local path 'models/all-MiniLM-L6-v2'...
+HRMPlayer loaded 'ARC.pth' onto cpu
+< System Maneuverability: 98 | Model 'ollama_gemma2b' Demand: 3.41 >
+< Decision: Manifesting 'ollama_gemma2b'. Virtuous service is possible. >
+OllamaPlayer configured for model 'gemma:2b'. Connection successful.
+< System Maneuverability: 98 | Model 'ollama_gemma2b' Demand: 3.41 >
+< Decision: Manifesting 'ollama_gemma2b'. Virtuous service is possible. >
+OllamaPlayer configured for model 'gemma:2b'. Connection successful.
+SagaGenerator initialized with player for model: gemma:2b
+
+==================== CYCLE 1/5 (Departure) ====================
+
+--- Running Aetheric Learning Trial ---
+Context: No Saga provided (first run).
+  Animus State: R=1.00e-09, C=0.00, M=0.45
+  Step 1 | Pos: (0, 0) | HRM Proposes: (np.int64(1), np.int64(1)) | Result: Valid
+  Step 2 | Pos: (np.int64(1), np.int64(1)) | HRM Proposes: (np.int64(2), np.int64(2)) | Result: Valid
+  Step 3 | Pos: (np.int64(2), np.int64(2)) | HRM Proposes: (np.int64(3), np.int64(3)) | Result: Valid
+  Step 4 | Pos: (np.int64(3), np.int64(3)) | HRM Proposes: (np.int64(4), np.int64(4)) | Result: Valid
+  Step 5 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 6 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 7 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 8 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 9 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 10 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 11 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 12 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 13 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 14 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 15 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 16 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 17 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 18 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 19 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 20 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 21 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 22 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 23 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 24 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 25 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 26 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 27 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 28 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 29 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+  Step 30 | Pos: (np.int64(4), np.int64(4)) | HRM Proposes: (np.int64(5), np.int64(5)) | Result: Blocked
+  -> Guide intervention triggered.
+
+  FAILURE! Step limit reached in this learning trial.
+
+Generating Saga using gemma:2b, saving to sagas/generated/aetheric_run_1.json...
+INFO: Extracted command list from key 'path' in LLM's dictionary response.
+Saga successfully generated and saved.
+Loaded 'sagas/generated/aetheric_run_1.json' as context for the next cycle.
+
+==================== CYCLE 2/5 (Trials) ====================
+
+--- Running Aetheric Learning Trial ---
+Context: Saga from previous run provided.
+  Animus State: R=6.72e-09, C=0.00, M=0.52
+
+--- FATAL ERROR: Learning experiment CRASHED: sequence item 0: expected str instance, list found ---
+
+==================================================
+      ALL AETHERIC CYCLES COMPLETE
+      Success Rate: 0/5
+==================================================
