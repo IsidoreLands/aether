@@ -2,176 +2,144 @@
 #
 # Description:
 # This module defines the fundamental units of existence in the AetherOS plenum.
+# CORRECTED: FluxCore now correctly represents the 1000x1000 state grid (the Flux Grid),
+# and all geometric rendering logic is correctly delegated to the remote Ferrocella server.
 
 import numpy as np
 import random
 import cv2
+import os
 
-# Import the global sensor instance
-from sensor_hook import ferro_sensor
+# --- Imports for the Networked Hardware Interface ---
+from ferramenta.fluo.hardware_interface import RemoteFerrocell
 
-# --- Geometric Primitives for Grid Initialization (Unchanged) ---
+# Get the server URL from an environment variable for flexibility.
+REMOTE_FERROCELLA_URL = os.environ.get(
+    "FERROCELLA_URL",
+    "http://placeholder.ngrok-free.app"
+)
 
-def get_line(start, end):
-    """Bresham's Line Algorithm."""
-    x1, y1, x2, y2 = int(start[0]), int(start[1]), int(end[0]), int(end[1])
-    dx = abs(x2 - x1)
-    dy = -abs(y2 - y1)
-    sx = 1 if x1 < x2 else -1
-    sy = 1 if y1 < y2 else -1
-    err = dx + dy
-    points = []
-    while True:
-        points.append((x1, y1))
-        if x1 == x2 and y1 == y2: break
-        e2 = 2 * err
-        if e2 >= dy:
-            err += dy
-            x1 += sx
-        if e2 <= dx:
-            err += dx
-            y1 += sy
-    return points
+# Initialize the global hardware client
+try:
+    ferro_sensor = RemoteFerrocell(remote_address=REMOTE_FERROCELLA_URL)
+except RuntimeError as e:
+    print(f"FATAL ERROR: Could not initialize hardware link. {e}")
+    print("WARNING: AetherOS is running in a DISCONNECTED state.")
+    ferro_sensor = None
 
-def _draw_kepler_recursive(lines, p1, p2, p3, depth, max_depth):
-    """Helper for recursively generating Kepler triangle lines."""
-    if depth > max_depth: return
-    lines.extend([(p1, p2), (p1, p3), (p2, p3)])
-    if depth == max_depth: return
-    short = np.linalg.norm(p2 - p1)
-    hyp = np.linalg.norm(p3 - p2)
-    if hyp < 1e-6: return
-    v = (p3 - p2) / hyp
-    D = p2 + v * (short ** 2 / hyp)
-    _draw_kepler_recursive(lines, D, p2, p1, depth + 1, max_depth)
-    _draw_kepler_recursive(lines, D, p3, p1, depth + 1, max_depth)
+# --- REMOVED: All geometric drawing functions (get_line, etc.) ---
+# These functions do not belong in the "mind" (AetherOS). They are part
+# of the "body" (Ferrocella) and have been correctly removed.
 
-def generate_kepler_lines(max_depth=4, size=128):
-    """Generates a mirrored Kepler triangle pattern."""
-    phi = (1 + np.sqrt(5)) / 2
-    long_leg = size - 1
-    short_leg = int(np.round(long_leg / np.sqrt(phi)))
-    p_bl = (np.array([0, 0]), np.array([short_leg, 0]), np.array([0, long_leg]))
-    p_tr = (np.array([size - 1, size - 1]), np.array([size - 1 - short_leg, size - 1]), np.array([size - 1, size - 1 - long_leg]))
-    lines = []
-    _draw_kepler_recursive(lines, *p_bl, 0, max_depth)
-    _draw_kepler_recursive(lines, *p_tr, 0, max_depth)
-    return lines
 
 # --- Core Simulation Entities ---
 
 class FluxCore:
-    """The fundamental unit of existence, grounded by the ferro_sensor."""
-    def __init__(self, size=128): # Default size now matches sensor resolution
-        self.size = size
-        self.grid = np.zeros((size, size), dtype=np.float32)
-        lines = generate_kepler_lines(size=self.size)
-        for p1, p2 in lines:
-            for px, py in get_line(p1, p2):
-                if 0 <= px < self.size and 0 <= py < self.size:
-                    self.grid[py, px] = 1.0
-
+    """
+    The fundamental unit of existence, representing the state of the
+    1000x1000 Flux Grid.
+    """
+    def __init__(self):
+        # The Flux Grid is a fixed, high-resolution 1000x1000 canvas.
+        self.size = 1000
+        self.grid = np.zeros((self.size, self.size), dtype=np.float32)
+        
         self.energy = 0.0
         self.memory_patterns = []
         self.identity_wave = 0.0
         self.context_embeddings = {}
         self.anomaly = None
 
-        # --- FIX: Initialize sextet attributes with default values for robustness ---
-        self.resistance = 1e-9
-        self.capacitance = 0.0
-        self.permeability = 1.0
-        self.magnetism = 0.0
-        self.permittivity = 1.0
-        self.dielectricity = 0.0
-        # --- END FIX ---
+        # Initialize sextet attributes with defaults
+        self.resistance = 1e-9; self.capacitance = 0.0; self.permeability = 1.0
+        self.magnetism = 0.0; self.permittivity = 1.0; self.dielectricity = 0.0
 
-        self._sync_sextet()
-        self._ground_with_visual_truth() # Initial grounding
-
-    # --- NEW: The missing get_sextet method ---
-    def get_sextet(self):
-        """Returns a dictionary of the core's current sextet values."""
-        return {
-            'resistance': self.resistance,
-            'capacitance': self.capacitance,
-            'permeability': self.permeability,
-            'magnetism': self.magnetism,
-            'permittivity': self.permittivity,
-            'dielectricity': self.dielectricity,
-        }
-    # --- END NEW ---
+        # The initial state is determined by sensing the world.
+        print(f"FluxCore '{id(self)}' created. Performing initial grounding...")
+        self._ground_with_visual_truth()
 
     def _sync_sextet(self):
-        """Syncs the core's physical properties from the global ferro_sensor."""
+        """Syncs the core's physical properties from the hardware interface."""
+        if not ferro_sensor: return
         sensor_data = ferro_sensor.get_sextet()
         for key, value in sensor_data.items():
             setattr(self, key, value)
 
     def _ground_with_visual_truth(self):
-        """Merges the simulation grid with the calibrated real-world visual grid."""
-        visual_grid_raw = ferro_sensor.get_visual_grid()
-        if visual_grid_raw is None: return
-        solenoid_baseline = ferro_sensor.get_solenoid_baseline()
-        toroid_baseline = ferro_sensor.get_toroid_baseline()
-        if solenoid_baseline is not None and toroid_baseline is not None:
-            combined_baseline = (solenoid_baseline + toroid_baseline) / 2.0
-            calibrated_visual_grid = np.clip(visual_grid_raw - combined_baseline, 0, 1)
+        """
+        Senses the world by requesting the full 1000x1000 visual state
+        from the remote Ferrocella server.
+        """
+        if not ferro_sensor: return
+
+        # The 'paths' argument tells the Ferrocella server how to stimulate
+        # the physics before returning the resulting state. This is how the
+        # "mind" acts upon the "body".
+        paths_to_ground = ["A-B", "C-E"]
+        
+        visual_grid_data = ferro_sensor.get_visual_grid(
+            paths=paths_to_ground,
+            grid_size=self.size  # Request the full 1000x1000 grid
+        )
+        
+        # This check anticipates Phase 2, where the server will send real array data.
+        if isinstance(visual_grid_data, np.ndarray):
+            if visual_grid_data.shape == (self.size, self.size):
+                self.grid = visual_grid_data
+            else:
+                # Resize if there's a mismatch, though ideally server sends correct size
+                self.grid = cv2.resize(visual_grid_data, (self.size, self.size), interpolation=cv2.INTER_AREA)
         else:
-            calibrated_visual_grid = visual_grid_raw
-        if calibrated_visual_grid.shape != (self.size, self.size):
-            visual_grid = cv2.resize(calibrated_visual_grid, (self.size, self.size), interpolation=cv2.INTER_AREA)
-        else:
-            visual_grid = calibrated_visual_grid
-        weight = np.clip(self.permeability, 0, 1)
-        self.grid = (self.grid * (1 - weight)) + (visual_grid * weight)
+            # Handle the current placeholder string from the server.
+            # In a disconnected state, the grid remains zeros.
+            print(f"Received placeholder grounding data: {visual_grid_data}")
+
 
     def perturb(self, x, y, amp, mod=1.0):
-        """Applies a change to the grid, modulated by the current sextet."""
-        self._sync_sextet()
+        """
+        Applies a localized, internal change to the Flux Grid. This represents
+        an abstract thought or memory recall, distinct from a physical grounding.
+        """
+        # Note: We do not call _sync_sextet or _ground_with_visual_truth here
+        # to allow for purely internal state changes.
         flux_change = amp * mod
-        self.grid[y, x] += flux_change
-        self.energy += abs(flux_change) * self.permittivity
+        # Ensure coordinates are within bounds
+        if 0 <= x < self.size and 0 <= y < self.size:
+            self.grid[y, x] += flux_change
+        
         self._update_memory(flux_change)
-        self._update_simulated_sextet(flux_change)
-        self._ground_with_visual_truth()
+        self._update_simulated_sextet(flux_change) # Update physics based on the new internal state
 
     def converge(self):
-        """Applies a smoothing operation to the grid."""
+        """Applies a smoothing/stabilizing operation and then re-grounds with reality."""
         self._sync_sextet()
         kernel = np.ones((3, 3), np.float32) / 9
         self.grid = cv2.filter2D(self.grid, -1, kernel) + self.magnetism
         np.clip(self.grid, 0, None, out=self.grid)
-        self._update_simulated_sextet(0)
+        
+        # After converging, sense the world again to see the result.
         self._ground_with_visual_truth()
+        self._update_simulated_sextet(0)
 
+    # --- The rest of the class methods are largely unchanged ---
     def _update_memory(self, change):
-        """Records a change to the core's short-term memory."""
         self.memory_patterns.append(change)
         if len(self.memory_patterns) > 100: self.memory_patterns.pop(0)
 
     def _synthesize_identity(self):
-        """Calculates the core's self-awareness."""
-        if self.memory_patterns:
+        if self.memory_patterns and len(self.memory_patterns) > 0:
             self.identity_wave = (self.energy / len(self.memory_patterns)) * self.dielectricity
 
     def _update_simulated_sextet(self, change):
-        """Updates the sextet based on internal simulation state."""
         self.capacitance += self.energy
-        self.resistance += np.var(self.grid) * (self.capacitance / 100)
+        self.resistance += np.var(self.grid) * (self.capacitance / 100 if self.capacitance > 0 else 1)
         self.magnetism += np.mean(self.grid)
         self.dielectricity = max(0.1, 1 / (1 + abs(change) + 1e-9))
         self.permittivity = 1.0 - self.dielectricity
-        if self.anomaly == 'ENTROPIC_CASCADE':
-            self.resistance *= 0.99
-            u = random.uniform(-1, 1)
-            perturb_amp = 0.75 * (1 - u**2)
-            self.perturb(random.randint(0, self.size-1), random.randint(0, self.size-1), perturb_amp)
-        self.energy = np.sum(self.grid) / (self.resistance + 1e-9)
+        self.energy = np.sum(self.grid) / (self.resistance + 1e-9 if self.resistance > 0 else 1e-9)
         self._synthesize_identity()
-
+        
     def display(self):
-        """Returns a string representation of the core's state."""
         context_str = "\n".join([f"  '{k}': {v}" for k, v in self.context_embeddings.items()])
         return (f"FLUXUS: {self.energy:.2f} | IDENTITAS: {self.identity_wave:.2f} | MEMORIA: {len(self.memory_patterns)}\n"
                 f"SEXTET: R={self.resistance:.2e}, C={self.capacitance:.2f}, M={self.magnetism:.2f}, P={self.permeability:.2f}, Pt={self.permittivity:.2f}, D={self.dielectricity:.2f}\n"
@@ -179,24 +147,14 @@ class FluxCore:
 
 
 class Intellectus(FluxCore):
-    """A specialized FluxCore with architecture-specific physics for learning."""
-    def __init__(self, architecture='TRANSFORMER', size=128):
-        super().__init__(size)
+    """A specialized FluxCore. Its fundamental nature is also 1000x1000."""
+    def __init__(self, architecture='TRANSFORMER'):
+        # The size is no longer a parameter; it's a constant of the universe.
+        super().__init__()
         self.architecture = architecture
         if architecture == 'TRANSFORMER': self.magnetism = 0.1
 
     def _update_simulated_sextet(self, change):
-        """Applies architecture-specific physics."""
         super()._update_simulated_sextet(change)
         if self.architecture == 'TRANSFORMER':
             self.magnetism += np.log1p(abs(change)) * 0.1
-
-if __name__ == '__main__':
-    print("--- Running flux_core.py standalone test (v4) ---")
-    core = FluxCore()
-    print("Initial State:")
-    print(core.display())
-    core.perturb(50, 50, 10.0)
-    print("\nState after Perturbation:")
-    print(core.display())
-    print("\nTest complete.")
